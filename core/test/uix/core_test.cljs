@@ -24,17 +24,27 @@
       (is (t/react-element-of-type? f "react.memo"))
       (is (= "<h1>1</h1>" (t/as-string #el [f {:x 1}])))))
 
-(require-lazy '[uix.test-lazy :refer [lazy-component]])
-
-(defui lazy-test []
-  #el [:> r/Suspense {:fallback "Loading..."}
-       #el [lazy-component {:x "hello lazy component"}]])
-
 (deftest test-require-lazy
-  (is (t/react-element-of-type? lazy-component "react.lazy"))
-  (let [dom (js/document.createElement "div")]
-    (react-dom/render #el [lazy-test] dom)
-    (js/console.log (.-innerHTML dom))))
+  (async done
+    (require-lazy '[uix.test-lazy :refer [lazy-component]])
+    (is (t/react-element-of-type? lazy-component "react.lazy"))
+    (js/setTimeout
+      (fn []
+        (let [dom (js/document.createElement "div")
+              after-render (fn [x y]
+                             ;; testing props roundtrip
+                             (is (= x "hello lazy component"))
+                             (is (= y {:z 1}))
+                             (done))]
+          (react-dom/render #el [:> r/Suspense {:fallback "Loading..."}
+                                 #el [lazy-component {:x "hello lazy component"
+                                                      :y {:z 1}
+                                                      :after-render after-render}]]
+                            dom)))
+      ;; waiting until shadow's loader runtime is loaded and initialized
+      ;; because loading a module right after the main one was loaded
+      ;; won't work
+      1000)))
 
 (deftest test-html
   (is (t/react-element-of-type? #el [:h1 1] "react.element")))
