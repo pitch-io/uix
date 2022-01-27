@@ -2,6 +2,7 @@
  :builds
  {:test {:target :browser
          :output-dir "out"
+         :module-loader true
          :modules {:main {:entries [uix.test-runner]}
                    :lazy {:entries [uix.test-lazy]
                           :depends-on #{:main}}}

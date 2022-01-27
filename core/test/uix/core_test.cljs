@@ -24,7 +24,7 @@
       (is (t/react-element-of-type? f "react.memo"))
       (is (= "<h1>1</h1>" (t/as-string #el [f {:x 1}])))))
 
-(require-lazy '[uix.test-lazy :refer [lazy-component]] :lazy)
+(require-lazy '[uix.test-lazy :refer [lazy-component]])
 
 (defui lazy-test []
   #el [:> r/Suspense {:fallback "Loading..."}

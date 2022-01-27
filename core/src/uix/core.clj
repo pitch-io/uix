@@ -61,6 +61,6 @@
 (defmacro require-lazy
   "require-like macro, returns lazy-loaded React components.
 
-  (require-lazy '[my.ns.components :refer [c1 c2]] :shadow-module-name)"
-  [form module-name]
-  (uix.core.lazy-loader/require-lazy form module-name))
+  (require-lazy '[my.ns.components :refer [c1 c2]])"
+  [form]
+  (uix.core.lazy-loader/require-lazy form))
