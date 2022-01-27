@@ -1,6 +1,7 @@
 (ns uix.core
   "Public API"
   (:require [uix.compiler.aot]
+            [uix.core.lazy-loader]
             [uix.source]
             [cljs.core]))
 
@@ -56,3 +57,10 @@
   "Returns source string of UIx component"
   [sym]
   (uix.source/source sym))
+
+(defmacro require-lazy
+  "require-like macro, returns lazy-loaded React components.
+
+  (require-lazy '[my.ns.components :refer [c1 c2]] :shadow-module-name)"
+  [form module-name]
+  (uix.core.lazy-loader/require-lazy form module-name))

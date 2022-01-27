@@ -17,11 +17,7 @@
      :args (s/cat :form :lazy/libspec :module-name keyword?)))
 
 #?(:clj
-   (defmacro require-lazy
-     "require-like macro, returns lazy-loaded React components.
-
-     (require-lazy '[my.ns.components :refer [c1 c2]] :shadow-module-name)"
-     [form module-name]
+   (defn require-lazy [form module-name]
      (let [m (s/conform :lazy/libspec form)]
        (when (not= m :clojure.spec.alpha/invalid)
          (let [{:keys [lib refer]} (:libspec m)]

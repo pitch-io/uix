@@ -2,6 +2,7 @@
   "Public API"
   (:require-macros [uix.core])
   (:require [react :as r]
+            [uix.core.lazy-loader]
             [uix.compiler.debug :as debug]
             [uix.hooks.alpha :as hooks]
             [uix.compiler.alpha :as compiler]
