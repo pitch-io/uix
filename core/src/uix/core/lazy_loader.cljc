@@ -3,38 +3,33 @@
   #?(:clj (:require [clojure.spec.alpha :as s]
                     [uix.specs.alpha]
                     [uix.lib])
-     :cljs (:require [cljs.loader]
+     :cljs (:require [shadow.loader :as loader]
                      [react])))
 
 #?(:cljs
    (def react-lazy react/lazy))
 
 #?(:cljs
-   (def load! cljs.loader/load))
+   (def load! loader/load))
 
 #?(:clj
    (s/fdef require-lazy
-     :args (s/cat :form :lazy/libspec)))
+     :args (s/cat :form :lazy/libspec :module-name keyword?)))
 
 #?(:clj
    (defmacro require-lazy
      "require-like macro, returns lazy-loaded React components.
 
-     (require-lazy '[my.ns.components :refer [c1 c2]])"
-     [form]
-     (if-not (uix.lib/cljs-env? &env)
-       `(clojure.core/require ~form)
-       (let [m (s/conform :lazy/libspec form)]
-         (when (not= m :clojure.spec.alpha/invalid)
-           (let [{:keys [lib refer]} (:libspec m)
-                 module (->> (str lib)
-                             (re-find #"\.([a-z0-9-]+)")
-                             second
-                             keyword)]
-             `(do
-                ~@(for [sym refer]
-                    (let [qualified-sym (symbol (str lib "/" sym))
-                          as-lazy `(uix.compiler.alpha/as-lazy-component (deref (cljs.core/resolve '~qualified-sym)))
-                          export `(cljs.core/js-obj "default" ~as-lazy)
-                          on-load `(fn [ok# fail#] (load! ~module #(ok# ~export)))]
-                      `(def ~sym (react-lazy (fn [] (~'js/Promise. ~on-load)))))))))))))
+     (require-lazy '[my.ns.components :refer [c1 c2]] :shadow-module-name)"
+     [form module-name]
+     (let [m (s/conform :lazy/libspec form)]
+       (when (not= m :clojure.spec.alpha/invalid)
+         (let [{:keys [lib refer]} (:libspec m)]
+           `(do
+              ~@(for [sym refer]
+                  (let [qualified-sym (symbol (str lib "/" sym))
+                        required-var `(deref (cljs.core/resolve '~qualified-sym))
+                        js-export `(cljs.core/js-obj "default" ~required-var)]
+                    `(def ~sym
+                       (react-lazy #(-> (load! ~(name module-name))
+                                        (.then (fn [] ~js-export)))))))))))))

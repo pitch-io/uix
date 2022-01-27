@@ -2,8 +2,7 @@
   "UTL and UIx components interpreter. Based on Reagent."
   (:require [react :as react]
             [uix.hooks.alpha :as hooks]
-            [cljs-bean.core :as bean]
-            [uix.compiler.debug :as debug]))
+            [cljs-bean.core :as bean]))
 
 (def ^:dynamic *default-compare-args* #(= (.-argv %1) (.-argv %2)))
 
@@ -13,14 +12,12 @@
 (defn symbol-for [s]
   (js* "Symbol.for(~{})" s))
 
-(defn as-lazy-component [f]
-  (debug/with-name f))
-
 (defn as-react [f]
   #(f (bean/bean %)))
 
 (defn validate-component [^js component-type]
-  (when-not ^boolean (.-uix-component? component-type)
+  (when (and (not ^boolean (.-uix-component? component-type))
+             (not= (symbol-for "react.lazy") (.-$$typeof component-type)))
     (let [name-str (or (.-displayName component-type)
                        (.-name component-type))]
       (throw (js/Error. (str "Invalid use of a non-UIx component " name-str " in #el form.\n"
