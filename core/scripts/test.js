@@ -5,10 +5,10 @@ const static = require('node-static');
 
 (async function run() {
 
-  const server = new static.Server();
+  const staticServer = new static.Server();
 
-  require('http').createServer(function (request, response) {
-    request.addListener('end', () => server.serve(request, response)).resume();
+  const httpServer = require('http').createServer(function (request, response) {
+    request.addListener('end', () => staticServer.serve(request, response)).resume();
   }).listen(3000);
 
   let failures = 0;
@@ -35,6 +35,7 @@ const static = require('node-static');
       if (failures > 0) {
         process.exit(1);
       }
+      httpServer.close();
     }
   );
 
