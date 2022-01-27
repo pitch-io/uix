@@ -1,8 +1,16 @@
 #!/usr/bin/env node
 
 const puppeteer = require('puppeteer');
+const static = require('node-static');
 
 (async function run() {
+
+  const server = new static.Server();
+
+  require('http').createServer(function (request, response) {
+    request.addListener('end', () => server.serve(request, response)).resume();
+  }).listen(3000);
+
   let failures = 0;
 
   const browser = await puppeteer.launch();
@@ -30,5 +38,5 @@ const puppeteer = require('puppeteer');
     }
   );
 
-  await page.goto(`file://${process.argv[2]}/index.html`);
+  await page.goto('http://localhost:3000');
 })();

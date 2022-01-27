@@ -1,7 +1,8 @@
 {
   "devDependencies": {
     "puppeteer": "1.20.0",
-    "react": "^17.0.2",
-    "react-dom": "^17.0.2"
+    "react": "17.0.2",
+    "react-dom": "17.0.2",
+    "node-static": "0.7.11"
   }
 }

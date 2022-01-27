@@ -26,12 +26,14 @@
 
 (require-lazy '[uix.test-lazy :refer [lazy-component]] :lazy)
 
+(defui lazy-test []
+  #el [:> r/Suspense {:fallback "Loading..."}
+       #el [lazy-component {:x "hello lazy component"}]])
+
 (deftest test-require-lazy
   (is (t/react-element-of-type? lazy-component "react.lazy"))
   (let [dom (js/document.createElement "div")]
-    (react-dom/render #el [:> r/Suspense {:fallback "Loading..."}
-                           #el [lazy-component {:x "hello lazy component"}]]
-                      dom)
+    (react-dom/render #el [lazy-test] dom)
     (js/console.log (.-innerHTML dom))))
 
 (deftest test-html
