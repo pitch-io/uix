@@ -1,5 +1,4 @@
 (ns uix.core.lazy-loader
-  #?(:cljs (:require-macros [uix.core.lazy-loader]))
   #?(:clj (:require [clojure.spec.alpha :as s]
                     [uix.specs.alpha]
                     [uix.lib])

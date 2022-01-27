@@ -2,7 +2,9 @@
  :builds
  {:test {:target :browser
          :output-dir "out"
-         :modules {:main {:entries [uix.test-runner]}}
+         :modules {:main {:entries [uix.test-runner]}
+                   :lazy {:entries [uix.test-lazy]
+                          :depends-on #{:main}}}
          :release {:compiler-options {:infer-externs true
                                       :closure-defines {goog.DEBUG false}}}}
   :benchmark {:target :browser

@@ -1,9 +1,9 @@
 (ns uix.core-test
   (:require [clojure.test :refer [deftest is async testing run-tests]]
-            [uix.core :as uix.core :refer [defui]]
-            ;[uix.core.lazy-loader :refer [require-lazy]]
+            [uix.core :refer [defui require-lazy]]
             [uix.lib]
             [react :as r]
+            [react-dom]
             [uix.test-utils :as t]
             [cljs-bean.core :as bean]))
 
@@ -24,9 +24,15 @@
       (is (t/react-element-of-type? f "react.memo"))
       (is (= "<h1>1</h1>" (t/as-string #el [f {:x 1}])))))
 
-#_(deftest test-require-lazy
-    (require-lazy '[uix.core :refer [strict-mode]])
-    (is (t/react-element-of-type? strict-mode "react.lazy")))
+(require-lazy '[uix.test-lazy :refer [lazy-component]] :lazy)
+
+(deftest test-require-lazy
+  (is (t/react-element-of-type? lazy-component "react.lazy"))
+  (let [dom (js/document.createElement "div")]
+    (react-dom/render #el [:> r/Suspense {:fallback "Loading..."}
+                           #el [lazy-component {:x "hello lazy component"}]]
+                      dom)
+    (js/console.log (.-innerHTML dom))))
 
 (deftest test-html
   (is (t/react-element-of-type? #el [:h1 1] "react.element")))
