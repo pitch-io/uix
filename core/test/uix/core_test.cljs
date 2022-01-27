@@ -16,13 +16,13 @@
 
   (is (= '("") (seq (uix.lib/re-seq* #"\s*" "")))))
 
-#_(deftest test-memoize
-    (uix.core/defui test-memoize-comp [{:keys [x]}]
-      (is (= 1 x))
-      #el [:h1 x])
-    (let [f (uix.core/memoize test-memoize-comp)]
-      (is (t/react-element-of-type? f "react.memo"))
-      (is (= "<h1>1</h1>" (t/as-string #el [f {:x 1}])))))
+(deftest test-memoize
+  (defui test-memoize-comp [{:keys [x]}]
+    (is (= 1 x))
+    #el [:h1 x])
+  (let [f (uix.core/memo test-memoize-comp)]
+    (is (t/react-element-of-type? f "react.memo"))
+    (is (= "<h1>1</h1>" (t/as-string #el [f {:x 1}])))))
 
 (deftest test-require-lazy
   (async done

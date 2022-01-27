@@ -17,7 +17,8 @@
 
 (defn validate-component [^js component-type]
   (when (and (not ^boolean (.-uix-component? component-type))
-             (not= (symbol-for "react.lazy") (.-$$typeof component-type)))
+             (not= (symbol-for "react.lazy") (.-$$typeof component-type))
+             (not= (symbol-for "react.memo") (.-$$typeof component-type)))
     (let [name-str (or (.-displayName component-type)
                        (.-name component-type))]
       (throw (js/Error. (str "Invalid use of a non-UIx component " name-str " in #el form.\n"
