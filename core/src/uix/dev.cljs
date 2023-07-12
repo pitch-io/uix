@@ -18,3 +18,8 @@
   "Should be called after hot-reload, in shadow's ^:dev/after-load hook"
   []
   (refresh/performReactRefresh))
+
+(defn uix-component?
+  "Returns true, if `f` is a UIx component created by `defui` or `uix/fn`"
+  [^js f]
+  (true? (.-uix-component? f)))

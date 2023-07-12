@@ -1,13 +1,14 @@
 (ns uix.core-test
-  (:require [clojure.test :refer [deftest is async testing run-tests]]
-            [uix.core :refer [defui $]]
-            [uix.lib]
+  (:require [clojure.string :as str]
+            [clojure.test :refer [async deftest is run-tests testing]]
             [react :as r]
             [react-dom]
-            [uix.test-utils :as t]
             [uix.compiler.attributes :as attrs]
+            [uix.core :refer [$ defui]]
+            [uix.dev]
             [uix.hiccup :refer [row-compiled]]
-            [clojure.string :as str]))
+            [uix.lib]
+            [uix.test-utils :as t]))
 
 (deftest test-use-ref
   (uix.core/defui test-use-ref-comp [_]
@@ -55,16 +56,16 @@
 
 (deftest test-lazy
   (async done
-         (let [expected-value :x
-               lazy-f (uix.core/lazy (fn [] (js/Promise. (fn [res] (js/setTimeout #(res expected-value) 100)))))]
-           (is (.-uix-component? lazy-f))
-           (try
-             (._init lazy-f (.-_payload lazy-f))
-             (catch :default e
-               (is (instance? js/Promise e))
-               (.then e (fn [v]
-                          (is (= expected-value (.-default ^js v)))
-                          (done))))))))
+    (let [expected-value :x
+          lazy-f (uix.core/lazy (fn [] (js/Promise. (fn [res] (js/setTimeout #(res expected-value) 100)))))]
+      (is (.-uix-component? lazy-f))
+      (try
+        (._init lazy-f (.-_payload lazy-f))
+        (catch :default e
+          (is (instance? js/Promise e))
+          (.then e (fn [v]
+                     (is (= expected-value (.-default ^js v)))
+                     (done))))))))
 
 (deftest test-create-class
   (let [actual (atom {:constructor {:this nil :props nil}
@@ -272,6 +273,12 @@
 (deftest js-obj-props
   (let [el ($ :div #js {:title "hello"} 1 2 3)]
     (is (= "hello" (.. el -props -title)))))
+
+(deftest test-uix-component?-predicate
+  (let [f (uix.core/fn [_] ($ :p "lorem ipsum"))]
+    (is (true? (uix.dev/uix-component? f))))
+  (let [f* (constantly ($ :p "lorem ipsum"))]
+    (is (false? (uix.dev/uix-component? f*)))))
 
 (defn -main []
   (run-tests))
