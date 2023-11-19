@@ -261,7 +261,7 @@
          (fn [props ref]
            (let [argv (cond-> (.-argv props)
                         (.-children props) (assoc :children (.-children props))
-                        :always (assoc :ref ref))
+                        (nil? (:ref (.-argv props))) (assoc :ref ref))
                  argv (merge argv
                              (-> (bean/bean props)
                                  (dissoc [:argv :children])))]
