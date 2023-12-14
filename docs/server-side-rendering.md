@@ -27,6 +27,8 @@ Similar to `react-dom/server` API there are two functions to render UIx componen
 - `uix.dom.server/render-to-static-markup` and `uix.dom.server/render-to-static-stream` — generates HTML string, can be used for templating
 - `uix.dom.server/render-to-string` and `uix.dom.server/render-to-stream` — generates HTML string that will be hydarated by React on the front-end, when HTML document is loaded
 
+You can read more about these [here](https://react.dev/reference/react-dom/server).
+
 ## How to write cross-platform UI code
 
 When UI should be rendered on JVM and hydrated on the client, that essentially means that same UI code should be able to run in both Clojure/JVM and ClojureScript/JS environments.
@@ -67,6 +69,7 @@ For that it's recommended to put shared code in `.cljc` namespaces and use [read
 ;; Hydrates server generated HTML into dynamic React UI
 (dom.client/hydrate-root (js/document.getElementById "root") ($ ui/title-bar))
 ```
+You can find a runnable template repo [here](https://github.com/elken/uix-ssr-demo) which you can adjust yourself as needed.
 
 ## Hooks
 
