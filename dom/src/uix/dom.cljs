@@ -74,5 +74,7 @@
   that exists outside the hierarchy of the DOM component.
 
   See: https://reactjs.org/docs/react-dom.html#createportal"
-  [child node]
-  (rdom/createPortal child node))
+  ([child node]
+   (rdom/createPortal child node))
+  ([child node key]
+   (rdom/createPortal child node key)))
