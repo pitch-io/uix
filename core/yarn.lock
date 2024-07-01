@@ -688,13 +688,13 @@ querystringify@^2.1.1:
   resolved "https://registry.yarnpkg.com/querystringify/-/querystringify-2.2.0.tgz#3345941b4153cb9d082d8eee4cda2016a9aef7f6"
   integrity sha512-FIqgj2EUvTa7R50u0rGsyTftzjYmv/a3hO345bZNrqabNqjtgiDMgmo4mkUjd+nzU5oF3dClKqFIPUKybUyqoQ==
 
-react-dom@^18.2.0:
-  version "18.2.0"
-  resolved "https://registry.yarnpkg.com/react-dom/-/react-dom-18.2.0.tgz#22aaf38708db2674ed9ada224ca4aa708d821e3d"
-  integrity sha512-6IMTriUmvsjHUjNtEDudZfuDQUoWXVxKHhlEGSk81n4YFS+r/Kl99wXiwlVXtPBtJenozv2P+hxDsw9eA7Xo6g==
+react-dom@^18.3.0-canary-01ab35a9a-20240228:
+  version "18.3.0-canary-01ab35a9a-20240228"
+  resolved "https://registry.yarnpkg.com/react-dom/-/react-dom-18.3.0-canary-01ab35a9a-20240228.tgz#9f6c7f1d97094251e9f74e3776220fb6fd2e3058"
+  integrity sha512-ZmRLXZcqQwOkJoVgPZUW3fGrRv4/hO5l+O387Pvc/bnmJMRkM07zSioJmlQOhsPkFTipO4BmEt6/uoS+1Ucs4A==
   dependencies:
     loose-envify "^1.1.0"
-    scheduler "^0.23.0"
+    scheduler "0.24.0-canary-01ab35a9a-20240228"
 
 react-is@^17.0.1:
   version "17.0.2"
@@ -706,10 +706,10 @@ react-refresh@^0.14.0:
   resolved "https://registry.yarnpkg.com/react-refresh/-/react-refresh-0.14.0.tgz#4e02825378a5f227079554d4284889354e5f553e"
   integrity sha512-wViHqhAd8OHeLS/IRMJjTSDHF3U9eWi62F/MledQGPdJGDhodXJ9PBLNGr6WWL7qlH12Mt3TyTpbS+hGXMjCzQ==
 
-react@^18.2.0:
-  version "18.2.0"
-  resolved "https://registry.yarnpkg.com/react/-/react-18.2.0.tgz#555bd98592883255fa00de14f1151a917b5d77d5"
-  integrity sha512-/3IjMdb2L9QbBdWiW5e3P2/npwMBaU9mHCSCUzNln0ZCYbcfTsGbTJrU/kGemdH2IWmB2ioZ+zkxtmq6g09fGQ==
+react@^18.3.0-canary-01ab35a9a-20240228:
+  version "18.3.0-canary-01ab35a9a-20240228"
+  resolved "https://registry.yarnpkg.com/react/-/react-18.3.0-canary-01ab35a9a-20240228.tgz#44c6da2c6a1d7056b211e108c3b373fadecc6bf8"
+  integrity sha512-fY5VfogdqDS+/40VQNVp+1XRu8C0eTIGaC/vcT8MSuavq2owXD4baS3Icn5xfLFGR3KX9UjEnoH3igetXMhQSg==
   dependencies:
     loose-envify "^1.1.0"
 
@@ -749,10 +749,10 @@ saxes@^6.0.0:
   dependencies:
     xmlchars "^2.2.0"
 
-scheduler@^0.23.0:
-  version "0.23.0"
-  resolved "https://registry.yarnpkg.com/scheduler/-/scheduler-0.23.0.tgz#ba8041afc3d30eb206a487b6b384002e4e61fdfe"
-  integrity sha512-CtuThmgHNg7zIZWAXi3AsyIzA3n4xx7aNyjwC2VJldO2LMVDhFK+63xGqq6CsJH4rTAt6/M+N4GhZiDYPx9eUw==
+scheduler@0.24.0-canary-01ab35a9a-20240228:
+  version "0.24.0-canary-01ab35a9a-20240228"
+  resolved "https://registry.yarnpkg.com/scheduler/-/scheduler-0.24.0-canary-01ab35a9a-20240228.tgz#7dd63631fc934cf70fe91204471ab3ffe914dbf7"
+  integrity sha512-cZQmfFuFbdgGt4kdimGIzxkR6GkFA2xdzDgOAo2N++Lgif3nDSvywseHFKb11JDl2/q6vlXeA5ePZW/ewUbpFg==
   dependencies:
     loose-envify "^1.1.0"
 

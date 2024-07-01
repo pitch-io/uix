@@ -126,3 +126,6 @@
    (r/useSyncExternalStore subscribe get-snapshot))
   ([subscribe get-snapshot get-server-snapshot]
    (r/useSyncExternalStore subscribe get-snapshot get-server-snapshot)))
+
+(defn use-optimistic [state update-fn]
+  (r/useOptimistic state update-fn))

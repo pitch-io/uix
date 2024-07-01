@@ -3,8 +3,8 @@
     "@testing-library/react": "^14.0.0",
     "jsdom": "^22.1.0",
     "process": "^0.11.10",
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
+    "react": "^18.3.0-canary-01ab35a9a-20240228",
+    "react-dom": "^18.3.0-canary-01ab35a9a-20240228",
     "react-refresh": "^0.14.0",
     "source-map-support": "^0.5.21"
   }
