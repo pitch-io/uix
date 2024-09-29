@@ -80,3 +80,6 @@
    (throw (UnsupportedOperationException. "should provide get-server-snapshot as well, during SSR")))
   ([subscribe get-snapshot get-server-snapshot]
    (get-server-snapshot)))
+
+(defn use-optimistic [state update-fn]
+  [state #(no-op "use-optimistic" %1)])

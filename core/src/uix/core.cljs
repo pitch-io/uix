@@ -188,6 +188,20 @@
   ([subscribe get-snapshot get-server-snapshot]
    (hooks/use-sync-external-store subscribe get-snapshot get-server-snapshot)))
 
+(defn use-optimistic
+  "Lets you show a different state while an async action is underway
+
+  state: current state value
+  update-fn: (current-state, optimistic-value) => optimistic-state
+
+  Returns a tuple of [optimistic-state, add-optimistic!]
+  optimistic-state: resulting optimistic state
+  add-optimistic!: takes optimistic-value and calls update-fn
+
+  See: https://react.dev/reference/react/useOptimistic"
+  [state update-fn]
+  (hooks/use-optimistic state update-fn))
+
 (defn as-react
   "Interop with React components. Takes a function that returns UIx component
   and returns same component wrapped into interop layer."

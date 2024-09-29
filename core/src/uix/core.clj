@@ -208,6 +208,9 @@
   ([subscribe get-snapshot get-server-snapshot]
    (hooks/use-sync-external-store subscribe get-snapshot get-server-snapshot)))
 
+(defn use-optimistic [state update-fn]
+  (hooks/use-optimistic state update-fn))
+
 (defn vector->js-array [coll]
   (cond
     (vector? coll) `(jsfy-deps (cljs.core/array ~@coll))

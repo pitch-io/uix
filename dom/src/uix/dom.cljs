@@ -78,3 +78,29 @@
    (rdom/createPortal child node))
   ([child node key]
    (rdom/createPortal child node key)))
+
+;; hooks
+
+(defn use-form-state
+  "Allows you to update state based on the result of a form action
+
+  f: the function to be called when the form is submitted or button pressed
+  state: the value you want the state to be initially
+  permalink: a string containing the unique page URL that this form modifies
+
+  Returns a tuple of [state, form-action]
+  state: current form state
+  form-action: a new action that you can pass as the `action` prop to your form component or `form-action` prop to any button component within the form
+
+  See: https://react.dev/reference/react-dom/hooks/useFormState"
+  ([f state]
+   (rdom/useFormState f state))
+  ([f state permalink]
+   (rdom/useFormState f state permalink)))
+
+(defn use-form-status
+  "Gives you status information of the last form submission
+
+  See: https://react.dev/reference/react-dom/hooks/useFormStatus"
+  []
+  (rdom/useFormStatus))
