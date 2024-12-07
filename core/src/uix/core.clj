@@ -33,10 +33,12 @@
     (swap! env/*compiler* assoc-in [::ana/namespaces ns :uix/specs sym] props-cond)))
 
 (defn- with-args-component [sym var-sym args body props-cond]
-  (let [props-sym (gensym "props")]
+  (let [props-sym (gensym "props")
+        [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
     `(defn ~sym [props#]
        (let [~props-sym (glue-args props#)
              ~args (cljs.core/array ~props-sym)
+             ~(or rest-sym `_#) (dissoc ~props-sym ~@dissoc-ks)
              f# (core/fn []
                   ~(with-props-cond props-cond props-sym)
                   ~@body)]
@@ -56,10 +58,12 @@
          (f#)))))
 
 (defn- with-args-fn-component [sym var-sym args body props-cond]
-  (let [props-sym (gensym "props")]
+  (let [props-sym (gensym "props")
+        [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
     `(core/fn ~sym [props#]
        (let [~props-sym (glue-args props#)
              ~args (cljs.core/array ~props-sym)
+             ~(or rest-sym `_#) (dissoc ~props-sym ~@dissoc-ks)
              f# (core/fn []
                   ~(with-props-cond props-cond props-sym)
                   ~@body)]
@@ -122,10 +126,12 @@
            ~(uix.dev/fast-refresh-signature memo-var-sym body)
            ~(when memo?
               `(def ~fname (uix.core/memo ~memo-sym)))))
-      (let [args-sym (gensym "args")]
+      (let [args-sym (gensym "args")
+            [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
         `(defn ~fname [& ~args-sym]
            ~(with-props-cond props-cond `(first ~args-sym))
-           (let [~args ~args-sym]
+           (let [~args ~args-sym
+                 ~(or rest-sym `_#) (dissoc (first ~args-sym) ~@dissoc-ks)]
              ~@fdecl))))))
 
 (defmacro fn
@@ -148,10 +154,12 @@
            (set! (.-uix-component? ~var-sym) true)
            ~(set-display-name var-sym (str var-sym))
            ~var-sym))
-      (let [args-sym (gensym "args")]
+      (let [args-sym (gensym "args")
+            [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
         `(core/fn ~fname [& ~args-sym]
            ~(with-props-cond props-cond `(first ~args-sym))
-           (let [~args ~args-sym]
+           (let [~args ~args-sym
+                 ~(or rest-sym `_#) (dissoc (first ~args-sym) ~@dissoc-ks)]
              ~@fdecl))))))
 
 (defmacro source
