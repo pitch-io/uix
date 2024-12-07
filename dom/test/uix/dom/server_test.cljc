@@ -1,5 +1,6 @@
 (ns uix.dom.server-test
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.core.async :as async]
+            [clojure.test :refer [deftest is testing]]
             [clojure.string :as str]
             [uix.core :as uix :refer [$ defui]]
             [uix.dom.server :as dom.server]
@@ -455,11 +456,76 @@
      (is (thrown? Exception (render ($ bad-username {:foo 1}))))))
 
 #?(:clj
+   (defmacro render-suspended [& body]
+     `(let [counter# (atom 0)]
+        (with-redefs [gensym (fn [] (symbol (str "G__" (swap! counter# inc))))]
+          (let [ch# (async/chan)]
+            (async/go
+             (let [chunks# (atom [])]
+               (dom.server/render-to-stream
+                 ~@body
+                 {:on-chunk #(swap! chunks# conj %)
+                  :on-done #(async/>!! ch# (str/join "" @chunks#))})))
+            (async/<!! ch#))))))
+
+#?(:clj
    (do
      (deftest test-suspense
-       (is (= (render ($ uix/suspense {:fallback ($ :div 1)}
-                         ($ :div 1)))
-              "<div>1</div>")))
+       (testing "without blocking data fetching in suspended UI"
+         (is (= (render-suspended
+                  ($ uix/suspense {:fallback ($ :div "fallback")}
+                     ;; TODO: shouldn't suspend non-blocking elements
+                     ($ :div 1)))
+                (str "<!--$?-->"
+                       "<template id='G__1'></template>" ;; placeholder + fallback
+                       "<div>fallback</div>"
+                     "<!--/$-->"
+                     dom.server/suspense-cleanup-js ;; insertion fn
+                     dom.server/suspense-error-runtime-js ;; error fn
+                     "<div hidden id='G__2'><div>1</div></div>" ;; streamed html
+                     "<script>$RC('G__1', 'G__2');</script>"))))
+       (testing "with blocking data fetching in suspended UI"
+         (defui suspended-comp []
+           (let [{:keys [data]} (dom.server/suspend {:write str :read str}
+                                  (Thread/sleep 100)
+                                  {:data 1})]
+             ($ :div data)))
+         (is (= (render-suspended
+                  ($ uix/suspense {:fallback ($ :div "fallback")}
+                    ($ suspended-comp)))
+                (str "<!--$?-->"
+                     "<template id='G__1'></template>" ;; placeholder + fallback
+                     "<div>fallback</div>"
+                     "<!--/$-->"
+                     dom.server/suspense-cleanup-js ;; insertion fn
+                     dom.server/suspense-error-runtime-js ;; error fn
+                     "<script>\n__suspended_resources__[\"uix_dom_server_test_489_33\"] = {:data 1};\n</script>\n" ;; server data
+                     "<div hidden id='G__2'><div>1</div></div>" ;; streamed html
+                     "<script>$RC('G__1', 'G__2');</script>")))) ;; calls insertion
+       (testing "with thrown error in suspended UI"
+         (defui suspended-comp-error []
+           (let [{:keys [data]} (dom.server/suspend {:write str :read str}
+                                                    (Thread/sleep 100)
+                                                    (throw (ex-info "Oooops" {}))
+                                                    {:data 1})]
+             ($ :div data)))
+         (is (= (render-suspended
+                  ($ uix/suspense {:fallback ($ :div "fallback")}
+                     ($ suspended-comp-error)))
+                (str "<!--$?-->"
+                     "<template id='G__1'></template>" ;; placeholder + fallback
+                     "<div>fallback</div>"
+                     "<!--/$-->"
+                     dom.server/suspense-cleanup-js ;; insertion fn
+                     dom.server/suspense-error-runtime-js ;; error fn
+                     (dom.server/suspense-error-client-rendering-js "G__1" "Oooops"))))) ;; calls error fn
+       (testing "static stream should render HTML synchronously"
+         (let [chunks (atom [])]
+           (dom.server/render-to-static-stream
+             ($ uix/suspense {:fallback ($ :div "fallback")}
+                ($ suspended-comp))
+             {:on-chunk #(swap! chunks conj %)})
+           (is (= "<div>1</div>" (str/join "" @chunks))))))
 
      (deftest test-strict-mode
        (is (= (render ($ uix/strict-mode

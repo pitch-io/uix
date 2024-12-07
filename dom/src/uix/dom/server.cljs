@@ -1,4 +1,5 @@
 (ns uix.dom.server
+  (:require-macros [uix.dom.server])
   (:require ["react-dom/server" :as rdom-server]))
 
 (defn render-to-string

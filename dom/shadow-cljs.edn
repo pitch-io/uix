@@ -5,6 +5,11 @@
          :output-dir "out"
          :output-to "out/main.js"}
 
+  :ssr {:target :browser
+        :output-dir "out"
+        :modules {:main {:entries [example.ui]
+                         :init-fn example.ui/render}}}
+
   :linter-test {:target :browser
                 :output-dir "out"
                 :modules {:main {:entries [uix.dom.linter-test]}}}}}
