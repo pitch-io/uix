@@ -94,3 +94,31 @@
                (elements-list? (second v)))
          (into [(first v) {}] (rest v))
          v))))
+
+#?(:clj
+   (do
+    (defn used-keys [sig]
+      (->> sig
+           (reduce-kv
+             (fn [ret k v]
+               (cond
+                 (and (keyword? k) (= "keys" (name k)))
+                 (if-let [ns (namespace k)]
+                   (into ret (map #(keyword ns (name %))) v)
+                   (into ret (map keyword) v))
+
+                 (= :strs k) (into ret (map str) v)
+                 (= :syms k) (into ret v)
+                 (= :& k) ret
+                 (keyword? v) (conj ret v)
+                 (string? v) (conj ret v)
+                 (symbol? v) (conj ret v)
+                 :else ret))
+             #{})))
+
+    (defn rest-props [[sig :as args]]
+      (if (map? sig)
+        (if-not (contains? sig :&)
+          [args]
+          [(update args 0 dissoc :&) (used-keys sig) (:& sig)])
+        [args]))))
