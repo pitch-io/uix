@@ -1,8 +1,13 @@
-{:deps {}
+{:deps {org.clojure/core.async {:mvn/version "1.6.681"}}
  :paths ["src"]
- :aliases {:dev {:extra-deps {org.clojure/clojure {:mvn/version "1.10.3"}
+ :aliases {:dev {:extra-paths ["dev"]
+                 :extra-deps {org.clojure/clojure {:mvn/version "1.10.3"}
                               org.clojure/clojurescript {:mvn/version "1.10.879"}
-                              uix.core/uix.core {:local/root "../core"}}}
+                              uix.core/uix.core {:local/root "../core"}
+                              http-kit/http-kit {:mvn/version "2.8.0"}
+                              compojure/compojure {:mvn/version "1.7.1"}
+                              thheller/shadow-cljs {:mvn/version "2.15.5"}
+                              com.cognitect/transit-cljs {:mvn/version "0.8.280"}}}
            :test {:extra-paths ["test"]
                   :extra-deps {clj-diffmatchpatch/clj-diffmatchpatch {:mvn/version "0.0.9.3"}
                                thheller/shadow-cljs {:mvn/version "2.15.5"}}}

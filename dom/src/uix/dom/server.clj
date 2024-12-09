@@ -2,7 +2,8 @@
   "Server-side rendering on JVM.
   Based on https://github.com/tonsky/rum/blob/gh-pages/src/rum/server_render.clj"
   (:require [clojure.string :as str]
-            [uix.compiler.attributes :as uix.attrs])
+            [uix.compiler.attributes :as uix.attrs]
+            [clojure.core.async :as async])
   (:import [clojure.lang IPersistentVector ISeq Ratio Keyword]))
 
 (def ^:dynamic *select-value*)
@@ -474,6 +475,7 @@
         (-> (render-fn [(derive-error-state e) identity] props)
             (-render-html *state sb))))))
 
+
 (defn render-component! [[f props & children :as el] *state sb]
   (if (-> f meta :uix.core/error-boundary)
     (let [[_ & args] el]
@@ -492,16 +494,76 @@
                   (f))))]
       (-render-html v *state sb))))
 
+(def suspense-error-runtime-js
+  "<script>
+    $RX=function(b,c,d,e,f){var a=document.getElementById(b);a&&(b=a.previousSibling,b.data=\"$!\",a=a.dataset,c&&(a.dgst=c),d&&(a.msg=d),e&&(a.stck=e),f&&(a.cstck=f),b._reactRetry&&b._reactRetry())};
+  </script>")
+
+(defn suspense-error-client-rendering-js [to-id error-msg]
+  (str "<script>$RX(\"" to-id "\", \"\", \"Switched to client rendering because the server rendering errored:\\n\\n" error-msg "\",\"\",\"\");</script>"))
+
+(def suspense-cleanup-js
+  "<script>
+  __suspended_resources__ = {};
+  $RC=function(b,c,e){c=document.getElementById(c);c.parentNode.removeChild(c);var a=document.getElementById(b);if(a){b=a.previousSibling;if(e)b.data=\"$!\",a.setAttribute(\"data-dgst\",e);else{e=b.parentNode;a=b.nextSibling;var f=0;do{if(a&&8===a.nodeType){var d=a.data;if(\"/$\"===d)if(0===f)break;else f--;else\"$\"!==d&&\"$?\"!==d&&\"$!\"!==d||f++}d=a.nextSibling;e.removeChild(a);a=d}while(a);for(;c.firstChild;)e.insertBefore(c.firstChild,a);b.data=\"$\"}b._reactRetry&&b._reactRetry()}};
+  </script>")
+
+;; $ SUSPENSE_START_DATA
+;; $! SUSPENSE_FALLBACK_START_DATA
+;; $? SUSPENSE_PENDING_START_DATA
+;; /$ SUSPENSE_END_DATA
+
+;; Atom<Set<html>>
+(def ^:dynamic *suspended-channels*)
+;; Atom<Map<id, value>>
+(def ^:dynamic *suspended-resources*)
+
+(defn- render-fallback [to-id fallback *state sb]
+  (append! sb (str "<!--$?--><template id='" to-id "'></template>"))
+  (-render-html fallback *state sb)
+  (append! sb "<!--/$-->"))
+
+(defn- render-suspended [to-id element *state]
+  (swap! *suspended-channels* conj
+    (async/go
+      (try
+        (let [sb (make-static-builder)
+              from-id (str (gensym))]
+          (append! sb "<div hidden id='" from-id "'>")
+          (-render-html element *state sb)
+          (append! sb (str "</div><script>$RC('" to-id "', '" from-id "');</script>"))
+          (str (.sb sb)))
+        (catch Exception e
+          (let [sb (make-static-builder)]
+            (append! sb (suspense-error-client-rendering-js to-id (ex-message e)))
+            (str (.sb sb))))))))
+
+(defn- suspend! [[_ fallback element] *state sb]
+  (let [to-id (str (gensym))]
+    (render-fallback to-id fallback *state sb)
+    (render-suspended to-id element *state)))
+
+(defn with-suspense? []
+  (bound? #'*suspended-channels*))
+
 (defn render-element!
   "Render an element vector as a HTML element."
   [element *state sb]
   (when-not (empty? element)
     (let [tag (nth element 0 nil)]
       (cond
+        (identical? :uix.core/suspense tag)
+        (if (with-suspense?)
+          (suspend! element *state sb)
+          ;; rendering static HTML
+          ;; executes all suspended components synchronously
+          (-render-html (nth element 2 nil) *state sb))
+
         (identical? :uix/bind-context tag)
         (let [binder (nth element 1 nil)
               children (seq (nth element 2 nil))]
           (binder #(-render-html children *state sb)))
+
         (identical? :<> tag) (render-fragment! element *state sb)
         (keyword? tag) (render-html-element! element *state sb)
         :else (render-component! element *state sb)))))
@@ -537,6 +599,31 @@
   (-render-html [this *state sb]
     :nop))
 
+(defn- with-suspense [{:keys [sb on-chunk on-done]} f]
+  (binding [*suspended-channels* (atom #{})
+            *suspended-resources* (atom {})]
+    (f)
+    (append! sb suspense-cleanup-js)
+    (append! sb suspense-error-runtime-js)
+    (async/<!!
+      (async/go-loop [cs (vec @*suspended-channels*)
+                      resolved-resources {}]
+        (if (pos? (count cs))
+          (let [[html ch] (async/alts! cs)]
+            (if (nil? html)
+              (recur (filterv #(not= ch %) cs) resolved-resources)
+              (let [resources (apply dissoc @*suspended-resources* (keys resolved-resources))
+                    resources-str (when (seq resources)
+                                    `["<script>"
+                                      ~@(->> resources
+                                             (map (fn [[k v]]
+                                                    (str "__suspended_resources__[\"" k "\"] = " v ";"))))
+                                      "</script>"])
+                    html (str/join "\n" (conj resources-str html))]
+                (on-chunk html)
+                (recur cs resources)))))))
+    (on-done)))
+
 ;;;;;;;;;;;;;; Public API
 
 (defn render-to-string
@@ -558,10 +645,11 @@
   "Same as `render-to-string`, but doesn't return anything,
   instead calls `on-chunk` for every chunk of generated HTML.
   Should be used for streaming HTML to clients to deliver markup faster."
-  [src {:keys [on-chunk]}]
+  [src {:keys [on-chunk on-done]}]
   (let [^StreamBuilder sb (make-stream-builder on-chunk)
         state (volatile! :state/root)]
-    (-render-html src state sb)))
+    (with-suspense {:sb sb :on-chunk on-chunk :on-done on-done}
+      #(-render-html src state sb))))
 
 (defn render-to-static-stream
   "Same as `render-to-static-markup`, but doesn't return anything,
@@ -571,3 +659,23 @@
   (let [^StreamBuilder sb (make-stream-builder on-chunk)
         state (volatile! :state/static)]
     (-render-html src state sb)))
+
+(defmacro suspend
+  "Evaluates blocking code on the server and makes the result available on the client for hydration.
+
+   On the server: evaluates body
+   On the client: reads server rendered data embedded into HTML
+
+   write — serializes suspended value and embeds into streamed HTML
+   read — reads serialized value on the client
+   loc — code location, optional, should be only provided when `suspend` is wrapped into a macro
+   body — blocking code, data fetching, etc."
+  [{:keys [write read loc]} & body]
+  (let [{:keys [line column]} (or loc (meta &form))
+        id (str (str/replace (.name *ns*) #"[\.-]" "_") "_" line "_" column)]
+    (if (:ns &env)
+      `(~read (aget js/__suspended_resources__ ~id))
+      `(let [v# (do ~@body)]
+         (when (with-suspense?)
+           (swap! *suspended-resources* assoc ~id (~write v#)))
+         v#))))
