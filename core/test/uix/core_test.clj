@@ -69,6 +69,39 @@
     (is (= el1 [test-clone-element-comp {:title 0 :key 1 :ref 2 :data-id 3 :children ["child2"]}]))
     (is (= el2 [:div {:title 0 :key 1 :ref 2 :data-id 3 :children ["child2"]}]))))
 
+(deftest test-rest-props
+  (testing "rest-props should extract rest props"
+    (is (= '[[{:keys [a b c :uix.core-test/name],
+               :strs [a b c "d"],
+               :syms [a b c uix.core/str],
+               :person/keys [name age],
+               {:m 1 :n 2 :k 3} :opts,
+               :or {a 1, b 2, c 3},
+               on-click :on-click}]
+             #{"d" a :on-click
+               :person/age :opts :c "a"
+               :uix.core-test/name uix.core/str
+               :person/name "b" :b c b "c" :a}
+             props]
+           (uix.lib/rest-props '[{:keys [a b c ::name]
+                                  :strs [a b c "d"]
+                                  :syms [a b c uix.core/str]
+                                  :person/keys [name age]
+                                  {:m 1 :n 2 :k 3} :opts
+                                  :or {a 1 b 2 c 3}
+                                  on-click :on-click
+                                  :& props}]))))
+  (testing "defui should return rest props"
+    (uix.core/defui rest-component [{:keys [a b] :& props}]
+      [props a b])
+    (is (= [{:c 3} 1 2] (rest-component {:a 1 :b 2 :c 3})))
+    (is (= [{} 1 2] (rest-component {:a 1 :b 2}))))
+  (testing "fn should return rest props"
+    (let [f (uix.core/fn rest-component [{:keys [a b] :& props}]
+              [props a b])]
+      (is (= [{:c 3} 1 2] (f {:a 1 :b 2 :c 3})))
+      (is (= [{} 1 2] (f {:a 1 :b 2}))))))
+
 (deftest test-props-check
   (testing "props check in defui"
     (uix.core/defui props-check-comp
