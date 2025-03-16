@@ -101,7 +101,7 @@ npm install react@19.0.0 react-dom@19.0.0 --save-dev
 - Global state management
   - [re-frame](https://day8.github.io/re-frame/), [example](https://github.com/pitch-io/uix/blob/master/docs/interop-with-reagent.md#syncing-with-ratoms-and-re-frame)
   - [refx](https://github.com/ferdinand-beyer/refx), [example](https://github.com/ferdinand-beyer/refx/tree/main/examples/uix)
-  - [re-signaali](https://github.com/metosin/re-signaali), [examples](https://github.com/metosin/re-signaali/tree/main/examples)
+  - [si-frame](https://github.com/metosin/si-frame), [examples](https://github.com/metosin/si-frame/tree/uix-examples/examples)
 - Data validation
   - clojure.spec (supported by [compile-time props validation](https://github.com/pitch-io/uix/blob/master/docs/props-validation.md#compile-time-props-validation))
   - [malli](https://github.com/metosin/malli)
