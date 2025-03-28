@@ -228,9 +228,9 @@ With associative rest and spread syntax, things become cleaner:
     ($ ui-form {:on-submit (.-handleSubmit f)
                 ;; props spread
                 :& props}
-      ($ :input (merge {:style input-style
-                        ;; props spread with JS object
-                        :& (.register f "first-name")})))))
+      ($ :input {:style input-style
+                 ;; props spread with JS object
+                 :& (.register f "first-name")}))))
 ```
 
 ### Props rest syntax
