@@ -263,7 +263,7 @@
                   ref (assoc "ref" ref))))
       el)))
 
-(defn inline-elements [hoisted env force?]
-  (when (or force? (release-build?))
+(defn inline-elements [hoisted env enabled? force?]
+  (when (or force? (and enabled? (release-build?)))
     (for [[form sym] hoisted]
       `(def ~sym ~(inline-element form {:env env})))))
