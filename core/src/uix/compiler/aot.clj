@@ -252,15 +252,19 @@
     (if (= `>el (first el))
       (let [[_ tag [_ props]] el
             props (or props (js-obj* {}))]
-        (js-obj*
-          (cond-> {"$$typeof" `(if react-19+? (.for ~'js/Symbol "react.transitional.element")
-                                              (.for ~'js/Symbol "react.element"))
-                   "type" tag
-                   "props" props
-                   "key" key
-                   "_owner" nil
-                   "_store" (js-obj* {"validated" true})}
-                  ref (assoc "ref" ref))))
+        `(let [ref# ~ref
+               props# ~(js-obj*
+                         {"$$typeof" `(if react-19+? (.for ~'js/Symbol "react.transitional.element")
+                                                     (.for ~'js/Symbol "react.element"))
+                          "type" tag
+                          "props" props
+                          "key" key
+                          "_owner" nil
+                          "_store" (js-obj* {"validated" true})})]
+           (if react-19+?
+             (when ref# (aset props# "ref" ref#))
+             (aset props# "ref" ref#))
+           props#))
       el)))
 
 (defn inline-elements [hoisted env force?]
