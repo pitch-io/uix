@@ -4,9 +4,13 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.pitch</groupId>
   <artifactId>uix.dom</artifactId>
-  <version>1.4.2</version>
+  <version>1.4.3</version>
   <name>dom</name>
   <licenses>
+    <license>
+      <name>Eclipse Public License - Version 2.0</name>
+      <url>https://www.eclipse.org/legal/epl-2.0/</url>
+    </license>
     <license>
       <name>Eclipse Public License - Version 2.0</name>
       <url>https://www.eclipse.org/legal/epl-2.0/</url>
@@ -27,7 +31,7 @@
   <scm>
     <connection>scm:git:git@github.com:pitch-io/uix.git</connection>
     <developerConnection>scm:git:git@github.com:pitch-io/uix.git</developerConnection>
-    <tag>3dc379a28bade6c9b392e369c474db73285d9286</tag>
+    <tag>e669dcc9d86181f3792b32e68e630791501bdd4f</tag>
     <url>https://github.com/pitch-io/uix/tree/master/dom</url>
   </scm>
   <build>

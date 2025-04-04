@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.4.3
+
+### Fixes
+
+- Added `uix.core/set-optimizations-enabled!` to disable elements inlining for projects that rely on monkey-patching `React.createElement` API
+- Fixed missing ref attribute in inlined elements for React 18
+
 ## 1.4.2
 
 ### Fixes
