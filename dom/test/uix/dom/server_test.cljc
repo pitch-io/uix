@@ -310,6 +310,11 @@
       :data-disabled "true"
       :data-checked "false"}))
 
+(defui comp-231 []
+  ($ :<>
+     ($ :br)
+     ($ :img)))
+
 (def components
   {"simple" comp-simple
    "tag" comp-tag
@@ -333,7 +338,8 @@
    "svg" comp-svg
    "aria" comp-aria
    "comp-151" comp-151
-   "comp-152" comp-152})
+   "comp-152" comp-152
+   "comp-231" comp-231})
 
 (def render-dir "server_render_test")
 
@@ -482,4 +488,8 @@
 
      (deftest test-vector-children
        (is (= (render ($ :div [($ :span) ($ :span)]))
-              "<div><span></span><span></span></div>")))))
+              "<div><span></span><span></span></div>")))
+
+     (deftest test-self-closing-tags
+       (is (= (render ($ :div ($ :img) ($ :br)))
+              "<div><img/><br/></div>")))))

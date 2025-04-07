@@ -262,9 +262,10 @@
 
 (defn normalize-element [[first second & rest]]
   (let [[tag tag-id tag-classes] (uix.attrs/parse-tag first)
-        [attrs children] (if (map? second)
-                           (normalize-children second rest)
-                           [nil (cons second rest)])
+        [attrs children] (cond
+                           (map? second) (normalize-children second rest)
+                           (nil? second) [nil rest]
+                           :else [nil (cons second rest)])
         attrs-classes (if (vector? (:class attrs))
                         (let [c (filter some? (:class attrs))]
                           (when (seq c)
