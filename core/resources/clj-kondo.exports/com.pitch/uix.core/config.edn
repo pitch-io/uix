@@ -2,11 +2,25 @@
            uix.core/defui   clojure.core/defn
            uix.core/defhook clojure.core/defn}
  :hooks   {:analyze-call {uix.core/$ hooks.uix/$
-                          uix.core/use-callback hooks.uix/hook
-                          uix.core/use-memo hooks.uix/hook
-                          uix.core/use-effect hooks.uix/hook
-                          uix.core/use-layout-effect hooks.uix/hook
-                          uix.core/use-insertion-effect hooks.uix/hook}}
+
+                          uix.core/use-callback hooks.uix/hook-deps
+                          uix.core/use-memo hooks.uix/hook-deps
+                          uix.core/use-effect hooks.uix/hook-deps
+                          uix.core/use-layout-effect hooks.uix/hook-deps
+                          uix.core/use-insertion-effect hooks.uix/hook-deps
+
+                          uix.core/use-state hooks.uix/hook
+                          uix.core/use-reducer hooks.uix/hook
+                          uix.core/use-ref hooks.uix/hook
+                          uix.core/use-context hooks.uix/hook
+                          uix.core/use-imperative-handle hooks.uix/hook
+                          uix.core/use-debug hooks.uix/hook
+                          uix.core/use-deferred-value hooks.uix/hook
+                          uix.core/use-transition hooks.uix/hook
+                          uix.core/use-id hooks.uix/hook
+                          uix.core/use-sync-external-store hooks.uix/hook
+                          uix.core/use-optimistic hooks.uix/hook
+                          uix.core/use-action-state hooks.uix/hook}}
  :linters {:uix.core/$-arg-validation {:level :warning}
            :uix.dom/$-invalid-attribute {:level :warning}
            :uix.core/$-non-ref-spread {:level :warning}
@@ -14,7 +28,10 @@
            :uix.core/hook-inline-function {:level :warning}
            :uix.core/hook-deps-array-literal {:level :warning}
            :uix.core/hook-deps-coll-literal {:level :warning}
+           :uix.core/hook-in-branch {:level :warning}
+           :uix.core/hook-in-loop {:level :warning}
            :uix.core/literal-value-in-deps {:level :warning}
+           :uix.core/$-missing-key {:level :warning}
 
            :type-mismatch
            {:level      :warning
