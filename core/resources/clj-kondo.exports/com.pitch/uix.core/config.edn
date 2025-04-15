@@ -30,6 +30,7 @@
            :uix.core/hook-deps-coll-literal {:level :warning}
            :uix.core/hook-in-branch {:level :warning}
            :uix.core/hook-in-loop {:level :warning}
+           :uix.core/hook-top-level {:level :warning}
            :uix.core/literal-value-in-deps {:level :warning}
            :uix.core/$-missing-key {:level :warning}
 

@@ -82,18 +82,26 @@
      sort-by some for doseq loop})
 
 (defn hook [{:keys [node]}]
-  (when (->> (api/callstack)
-             (some #(and (contains? '#{cljs.core clojure.core} (:ns %))
-                         (cond-forms (:name %)))))
-    (api/reg-finding! (-> (meta node)
-                          (merge {:message "React Hook is called conditionally. React Hooks must be called in the exact same order in every component render. Read https://react.dev/reference/rules/rules-of-hooks for more context"
-                                  :type    :uix.core/hook-in-branch}))))
-  (when (->> (api/callstack)
-             (some #(and (contains? '#{cljs.core clojure.core} (:ns %))
-                         (loop-forms (:name %)))))
-    (api/reg-finding! (-> (meta node)
-                          (merge {:message "React Hook may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render. Read https://react.dev/reference/rules/rules-of-hooks for more context"
-                                  :type    :uix.core/hook-in-loop})))))
+  (let [cs (api/callstack)]
+    (when (->> cs (some #(and (contains? '#{cljs.core clojure.core} (:ns %))
+                              (cond-forms (:name %)))))
+      (api/reg-finding! (-> (meta node)
+                            (merge {:message "React Hook is called conditionally. React Hooks must be called in the exact same order in every component render. Read https://react.dev/reference/rules/rules-of-hooks for more context"
+                                    :type    :uix.core/hook-in-branch}))))
+    (when (->> cs (some #(and (contains? '#{cljs.core clojure.core} (:ns %))
+                              (loop-forms (:name %)))))
+      (api/reg-finding! (-> (meta node)
+                            (merge {:message "React Hook may be executed more than once. Possibly because it is called in a loop. React Hooks must be called in the exact same order in every component render. Read https://react.dev/reference/rules/rules-of-hooks for more context"
+                                    :type    :uix.core/hook-in-loop}))))
+    (when (->> cs
+               (some #(or (and (contains? '#{cljs.core clojure.core} (:ns %))
+                               (contains? '#{fn fn* defn defn- defmethod} (:name %)))
+                          (and (contains? '#{uix.core} (:ns %))
+                               (contains? '#{defui fn} (:name %)))))
+               not)
+      (api/reg-finding! (-> (meta node)
+                            (merge {:message "React Hook cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function."
+                                    :type    :uix.core/hook-top-level}))))))
 
 (defn hook-deps [{:keys [node] :as ctx}]
   (let [[f deps :as expr] (rest (api/sexpr node))]
