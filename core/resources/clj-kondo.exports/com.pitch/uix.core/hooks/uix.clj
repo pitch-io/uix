@@ -154,10 +154,10 @@
       [(update args 0 dissoc :&) (used-keys sig) (:& sig)])
     [args]))
 
-(defn rewrite [node]
+(defn rewrite [node & {:keys [defui?]}]
   (let [args (rest (:children node))
         component-name (first args)
-        ?docstring (when (string? (api/sexpr (second args)))
+        ?docstring (when (and defui? (string? (api/sexpr (second args))))
                      (second args))
         args (if ?docstring
                (nnext args)
@@ -178,7 +178,7 @@
                body)]
     (with-meta
       (api/list-node
-        (list* (api/token-node 'defn)
+        (list* (api/token-node (if defui? 'defn 'fn))
                component-name
                (if ?docstring
                  (into (into [?docstring] pre-body) body)
@@ -186,5 +186,9 @@
       (meta node))))
 
 (defn defui [{:keys [node] :as ctx}]
-  (let [new-node (rewrite node)]
+  (let [new-node (rewrite node :defui? true)]
+    {:node new-node}))
+
+(defn anon-fn [{:keys [node] :as ctx}]
+  (let [new-node (rewrite node :defui? false)]
     {:node new-node}))

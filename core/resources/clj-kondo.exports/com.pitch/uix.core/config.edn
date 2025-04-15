@@ -1,6 +1,6 @@
-{:lint-as {uix.core/fn      clojure.core/fn
-           uix.core/defhook clojure.core/defn}
+{:lint-as {uix.core/defhook clojure.core/defn}
  :hooks   {:analyze-call {uix.core/defui hooks.uix/defui
+                          uix.core/fn hooks.uix/anon-fn
                           uix.core/$ hooks.uix/$
 
                           uix.core/use-callback hooks.uix/hook-deps
