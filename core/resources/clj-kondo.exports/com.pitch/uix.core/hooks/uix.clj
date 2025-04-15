@@ -170,7 +170,7 @@
                       (map? (first args-vec))
                       (contains? (first args-vec) :&))
                (let [[_ _ rest-sym] (rest-props args-vec)
-                     rest-sym (api/token-node rest-sym)]
+                     rest-sym (with-meta (api/token-node rest-sym) (meta rest-sym))]
                  [(api/list-node
                     (list* (api/token-node 'let*)
                            (api/vector-node [rest-sym (api/token-node nil)])
