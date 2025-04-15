@@ -127,3 +127,64 @@
         (api/reg-finding! (-> (meta node)
                               (merge {:message (str "React Hook was passed literal values in dependency vector: [" (clojure.string/join ", " (deps->literals deps)) "]. Those are not valid dependencies because they never change. You can safely remove them.")
                                       :type    :uix.core/literal-value-in-deps})))))))
+
+(defn used-keys [sig]
+  (->> sig
+       (reduce-kv
+         (fn [ret k v]
+           (cond
+             (and (keyword? k) (= "keys" (name k)))
+             (if-let [ns (namespace k)]
+               (into ret (map #(keyword ns (name %))) v)
+               (into ret (map keyword) v))
+
+             (= :strs k) (into ret (map str) v)
+             (= :syms k) (into ret v)
+             (= :& k) ret
+             (keyword? v) (conj ret v)
+             (string? v) (conj ret v)
+             (symbol? v) (conj ret v)
+             :else ret))
+         #{})))
+
+(defn rest-props [[sig :as args]]
+  (if (map? sig)
+    (if-not (contains? sig :&)
+      [args]
+      [(update args 0 dissoc :&) (used-keys sig) (:& sig)])
+    [args]))
+
+(defn rewrite [node]
+  (let [args (rest (:children node))
+        component-name (first args)
+        ?docstring (when (string? (api/sexpr (second args)))
+                     (second args))
+        args (if ?docstring
+               (nnext args)
+               (next args))
+        args-vec (api/sexpr (first args))
+        [pre-body body] (if (api/map-node? (second args))
+                          [(take 2 args) (nnext args)]
+                          [(take 1 args) (next args)])
+        body (if (and (vector? args-vec)
+                      (map? (first args-vec))
+                      (contains? (first args-vec) :&))
+               (let [[_ _ rest-sym] (rest-props args-vec)
+                     rest-sym (api/token-node rest-sym)]
+                 [(api/list-node
+                    (list* (api/token-node 'let*)
+                           (api/vector-node [rest-sym (api/token-node nil)])
+                           body))])
+               body)]
+    (with-meta
+      (api/list-node
+        (list* (api/token-node 'defn)
+               component-name
+               (if ?docstring
+                 (into (into [?docstring] pre-body) body)
+                 (into (vec pre-body) body))))
+      (meta node))))
+
+(defn defui [{:keys [node] :as ctx}]
+  (let [new-node (rewrite node)]
+    {:node new-node}))
