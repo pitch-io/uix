@@ -4,7 +4,8 @@
 (defn $ [{:keys [node]}]
   (let [[sym _args] (rest (api/sexpr node))]
     (when-not (or (symbol? sym)
-                  (keyword? sym))
+                  (keyword? sym)
+                  (list? sym))
       (api/reg-finding! (-> (meta node)
-                            (merge {:message "First arg to $ must be a symbol or keyword"
+                            (merge {:message "First arg to $ must be a symbol, keyword, or dynamic element"
                                     :type    :uix.core/$-arg-validation}))))))
