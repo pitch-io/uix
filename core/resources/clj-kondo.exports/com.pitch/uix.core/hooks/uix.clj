@@ -96,25 +96,26 @@
                                   :type    :uix.core/hook-in-loop})))))
 
 (defn hook-deps [{:keys [node] :as ctx}]
-  (let [[f deps] (rest (api/sexpr node))]
+  (let [[f deps :as expr] (rest (api/sexpr node))]
     (hook ctx)
     (when-not (fn-literal? f)
       (api/reg-finding! (-> (meta node)
                             (merge {:message "React Hook received a function whose dependencies are unknown. Pass an inline function instead."
                                     :type    :uix.core/hook-inline-function}))))
-    (cond
-      (and (-> node :children last :children first :value (= 'js))
-           (-> node :children last :children second api/tag (= :vector)))
-      (api/reg-finding! (-> (meta node)
-                            (merge {:message "React Hook was passed a dependency list that is a JavaScript array, instead of Clojure’s vector. Change it to be a vector literal."
-                                    :type    :uix.core/hook-deps-array-literal})))
+    (when (== 2 (count expr))
+      (cond
+        (and (-> node :children last :children first :value (= 'js))
+             (-> node :children last :children second api/tag (= :vector)))
+        (api/reg-finding! (-> (meta node)
+                              (merge {:message "React Hook was passed a dependency list that is a JavaScript array, instead of Clojure’s vector. Change it to be a vector literal."
+                                      :type    :uix.core/hook-deps-array-literal})))
 
-      (not (vector? deps))
-      (api/reg-finding! (-> (meta node)
-                            (merge {:message "React Hook was passed a dependency list that is not a vector literal. This means we can’t statically verify whether you've passed the correct dependencies. Change it to be a vector literal with explicit set of dependencies."
-                                    :type    :uix.core/hook-deps-coll-literal})))
+        (not (vector? deps))
+        (api/reg-finding! (-> (meta node)
+                              (merge {:message "React Hook was passed a dependency list that is not a vector literal. This means we can’t statically verify whether you've passed the correct dependencies. Change it to be a vector literal with explicit set of dependencies."
+                                      :type    :uix.core/hook-deps-coll-literal})))
 
-      (seq (deps->literals deps))
-      (api/reg-finding! (-> (meta node)
-                            (merge {:message (str "React Hook was passed literal values in dependency vector: [" (clojure.string/join ", " (deps->literals deps)) "]. Those are not valid dependencies because they never change. You can safely remove them.")
-                                    :type    :uix.core/literal-value-in-deps}))))))
+        (seq (deps->literals deps))
+        (api/reg-finding! (-> (meta node)
+                              (merge {:message (str "React Hook was passed literal values in dependency vector: [" (clojure.string/join ", " (deps->literals deps)) "]. Those are not valid dependencies because they never change. You can safely remove them.")
+                                      :type    :uix.core/literal-value-in-deps})))))))
