@@ -2,7 +2,8 @@
   "Public API"
   (:refer-clojure :exclude [use])
   (:require-macros [uix.core])
-  (:require [goog.object :as gobj]
+  (:require [clojure.edn :as edn]
+            [goog.object :as gobj]
             [react]
             [uix.hooks.alpha :as hooks]
             [uix.compiler.aot]
@@ -348,3 +349,11 @@
 (defn ^{:jsdoc ["@nosideeffects"]} set-display-name [f name]
   (set! (.-displayName f) name)
   (js/Object.defineProperty f "name" #js {:value name}))
+
+;; RSC
+
+(defn ^{:jsdoc ["@nosideeffects"]} register-rsc-client! [str-name ref]
+  (let [comp #(uix.core/$ ref (edn/read-string (aget % "rsc/props")))]
+    (set! (.-displayName comp) (str "rsc(" str-name ")"))
+    (set! (.-RSC_MODULES js/window) (or  (.-RSC_MODULES js/window) #js {}))
+    (aset (.-RSC_MODULES js/window) str-name comp)))

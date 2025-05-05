@@ -27,4 +27,12 @@
              :asset-path "/out"
              :modules {:main {:entries [uix.examples]
                               :init-fn uix.examples/init}}
-             :devtools {:preloads [uix.preload]}}}}
+             :devtools {:preloads [uix.preload]}}
+
+  :rsc {:target :browser
+        :output-dir "rsc-out"
+        :asset-path "/rsc-out"
+        :modules {:rsc {:entries [uix.rsc-example.client.root]
+                        :init-fn uix.rsc-example.client.root/init}}
+        :devtools {:preloads [uix.preload]}
+        :build-hooks [(shadow.cljs.build-report/hook)]}}}
