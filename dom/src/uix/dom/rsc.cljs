@@ -14,11 +14,9 @@
    rsc-endpoint – endpoint that generates React Flight payload
    server-actions-endpoint – endpoint that executes server actions"
   [{:keys [container routes rsc-endpoint server-actions-endpoint]}]
-  (let [root (dom/create-root container)]
-    (dom/render-root
-      ($ uix/strict-mode
-        ($ uix.rsc/router
-           {:routes routes
-            :rsc-endpoint rsc-endpoint
-            :server-actions-endpoint server-actions-endpoint}))
-      root)))
+  (uix/start-transition
+    #(dom/hydrate-root container
+       ($ uix.rsc/router
+          {:routes routes
+           :rsc-endpoint rsc-endpoint
+           :server-actions-endpoint server-actions-endpoint}))))

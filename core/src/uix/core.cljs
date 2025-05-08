@@ -353,7 +353,9 @@
 ;; RSC
 
 (defn ^{:jsdoc ["@nosideeffects"]} register-rsc-client! [str-name ref]
-  (let [comp #(uix.core/$ ref (edn/read-string (aget % "rsc/props")))]
-    (set! (.-displayName comp) (str "rsc(" str-name ")"))
-    (set! (.-RSC_MODULES js/window) (or  (.-RSC_MODULES js/window) #js {}))
-    (aset (.-RSC_MODULES js/window) str-name comp)))
+  (js* "window.RSC_MODULES ||= {}")
+  (if (.-uix-component? ^js ref)
+    (let [comp #(uix.core/$ ref (edn/read-string (aget % "rsc/props")))]
+      (set! (.-displayName comp) (str "rsc(" str-name ")"))
+      (aset (.-RSC_MODULES js/window) str-name comp))
+    (aset (.-RSC_MODULES js/window) str-name ref)))

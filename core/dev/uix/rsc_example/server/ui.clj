@@ -17,7 +17,8 @@
   (StringEscapeUtils/unescapeHtml4 text))
 
 (defui story [{:keys [data]}]
-  (let [{:keys [id by score time title url kids]} data]
+  (let [{:keys [id by score time title url kids]} data
+        time (or time 0)]
     ($ :div.text-stone-800.px-4.py-2.bg-emerald-600.border-b.border-emerald-700.hover:bg-emerald-700
        ($ :a.text-sm.text-emerald-50.mb-1.block.hover:underline
           {:href url
@@ -29,7 +30,7 @@
          " | "
           ;; todo: convert server action to client ref
           ;; ($ ui/vote-btn {:on-click actions/vote} ...)
-         ($ ui/vote-btn {:id id :score score})
+         ($ ui/vote-btn {:id id :score score :on-click ui/say-hi})
          " | "
          ($ :div
             (to-locale-string (* 1e3 time)))

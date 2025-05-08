@@ -20,7 +20,7 @@
 (def router
   (r/router routes))
 
-(defn handler [request]
+(defn rsc-handler [request]
   (let [{:keys [route]} (read-end-stream (:body request))
         route (r/match-by-path router (:path route))]
     ;; request -> route -> react flight rows -> response stream
@@ -33,10 +33,26 @@
                     (rsc/render-to-flight-stream ($ root {:route route})
                                                  {:on-chunk on-chunk})))})))
 
+(defn html-handler [request]
+  (when-let [route (r/match-by-path router (:uri request))]
+    (server/as-channel request
+      {:on-open (fn [ch]
+                  (let [on-chunk (fn [chunk]
+                                   (if (= chunk :done)
+                                     (server/close ch)
+                                     (server/send! ch (str "<script>(window.__FLIGHT_DATA ||=[]).push(`" chunk "`);</script>") false)))
+                        on-html (fn [html]
+                                  (server/send! ch "<link rel=\"stylesheet\" href=\"/rsc-out/main.css\"><div id=root>" false)
+                                  (server/send! ch html false)
+                                  (server/send! ch "</div><script src=\"/rsc-out/rsc.js\"></script>" false))]
+                    (rsc/render-to-html-stream ($ root {:route route})
+                                               {:on-chunk on-chunk
+                                                :on-html on-html})))})))
+
 (defroutes server-routes*
   ;; react flight payload endpoint
   (POST "/rsc" req
-    (handler req))
+    (rsc-handler req))
   ;; server actions endpoint
   (POST "/api" {body :body}
     (try
@@ -51,9 +67,11 @@
   (route/files "/" {:root "./"})
   ;; always serving index.html instead of 404
   (GET "/*" req
+    (html-handler req)
     ;; todo: render flight payload into html on initial load
-    (-> (resp/file-response "index.html" {:root "./"})
-        (resp/header "Content-Type" "text/html"))))
+    #_(-> (resp/file-response "index.html" {:root "./"})
+          (resp/header "Content-Type" "text/html")))
+  (resp/not-found "404"))
 
 (defn start-server []
   (server/run-server #'server-routes* {:port 8080})

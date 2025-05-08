@@ -8,6 +8,8 @@
   (:import [clojure.lang IBlockingDeref IPersistentVector ISeq]))
 
 (defprotocol FlightRenderer
+  (-unwrap [this]
+    "Unwraps component tree into data representation")
   (-render [this sb]
     "Renders a type into React Flight format"))
 
@@ -25,11 +27,14 @@
    output: I:['rsc' 'var-name' false]
            [$ $L key props]"
   [[tag :as el] sb]
-  (let [id (get-id sb)
-        rsc-id (:rsc/id (meta tag))
-        {:keys [children] :as props} (normalize-props el)]
-    (swap! sb update :imports assoc id
-           (str "I" (json/generate-string ["rsc" rsc-id false])))
+  (let [rsc-id (:rsc/id (meta tag))
+        {:keys [children] :as props} (normalize-props el)
+        ref-import (str "I" (json/generate-string ["rsc" rsc-id false]))
+        ;; dedupe client refs
+        id (or (->> @sb :imports (some (fn [[id v]] (when (= v ref-import) id))))
+               (let [id (get-id sb)]
+                 (swap! sb update :imports assoc id ref-import)
+                 id))]
     ["$" (str "$L" id)
      (:key props)
      {"rsc/props"
@@ -76,27 +81,64 @@
     (keyword? tag) (render-dom-element el sb)
     :else (throw (IllegalArgumentException. (str (type tag) " " tag " is not a valid element type")))))
 
+(defn unwrap-component-element [[tag :as el]]
+  (let [props (normalize-props el)
+        v (if (seq props)
+            (tag props)
+            (tag))]
+    (-unwrap v)))
+
+(defn unwrap-fragment-element [[tag attrs & children]]
+  (let [children (if (map? attrs)
+                   children
+                   (cons attrs children))]
+    (-unwrap children)))
+
+(defn unwrap-dom-element [el]
+  (let [[tag attrs children] (dom.server/normalize-element el)]
+    (into [(keyword tag) attrs] (map -unwrap children))))
+
+(defn unwrap-element [[tag :as el]]
+  (cond
+    (client-component? tag) el
+    (fn? tag) (unwrap-component-element el)
+    (= :<> tag) (unwrap-fragment-element el)
+    (keyword? tag) (unwrap-dom-element el)
+    :else (throw (IllegalArgumentException. (str (type tag) " " tag " is not a valid element type")))))
+
 (extend-protocol FlightRenderer
   IPersistentVector
+  (-unwrap [this]
+    (if (vector? (first this))
+      (map -unwrap this)
+      (unwrap-element this)))
   (-render [this sb]
     (if (vector? (first this))
       (map #(-render % sb) this)
       (render-element! this sb)))
 
   ISeq
+  (-unwrap [this]
+    (map -unwrap this))
   (-render [this sb]
     (map #(-render % sb) this))
 
   String
+  (-unwrap [this]
+    this)
   (-render [this sb]
     this)
 
   Object
+  (-unwrap [this]
+    (-unwrap (str this)))
   (-render [this sb]
     (-render (str this) sb))
 
   Throwable
   ;; throwable serializer
+  (-unwrap [this]
+    this)
   (-render [this sb]
     (str "E" (json/generate-string
                {:digest ""
@@ -107,6 +149,10 @@
   ;; async values serializer
   ;; and continues rendering while blocking operation
   ;; runs concurrently
+  ;; todo: support pending components
+  (-unwrap [this]
+    ;; todo: maybe should not be empty
+    @this)
   (-render [this sb]
     (when-not (contains? (:pending @sb) this)
       (let [id (get-id sb)
@@ -120,6 +166,8 @@
       (str "$@" id)))
 
   nil
+  (-unwrap [this]
+    :nop)
   (-render [this sb]
     :nop))
 
@@ -156,15 +204,15 @@
 
 (comment
   (do
-    (defn like-article []
+    (require 'uix.rsc)
+    (uix.rsc/defaction like-article []
       1)
-    (defui ^:client button [{:keys [title children]}]
-      ($ :button {:title title}
-         children))
-    (render-to-flight-stream
-      ($ :div {:title "hello"}
-         ($ :h1 "hello world")
-         (for [x (range 3)]
-           ($ button {:key x :title "btn"} "press me"))
-         8)
-      {:on-chunk println})))
+    (defui page []
+      ($ :div
+         ($ :span @(future (Thread/sleep 1000) "hello"))
+         ($ :button "press me")))
+    (let [ast (-unwrap ($ page))]
+      (println (dom.server/render-to-string ast))
+      (render-to-flight-stream
+        ast
+        {:on-chunk println}))))

@@ -5,7 +5,8 @@
                        [reitit.core :as r]
                        [reitit.frontend :as rf]
                        [reitit.frontend.easy :as rfe]])
-            #?@(:clj [[uix.dom.server.flight :as server.flight]
+            #?@(:clj [[uix.dom.server :as dom.server]
+                      [uix.dom.server.flight :as server.flight]
                       [uix.lib :as lib]])
             [uix.core :refer [defui $] :as uix]))
 
@@ -26,6 +27,21 @@
    (defonce server-actions-endpoint- (atom nil)))
 
 #?(:cljs
+   (defn- create-initial-flight-stream []
+     (let [controller (atom nil)
+           encoder (js/TextEncoder.)]
+       (js/document.addEventListener "DOMContentLoaded" #(some-> @controller (.close)))
+       (rsd-client/createFromReadableStream
+         (js/ReadableStream.
+           #js {:start (fn [ctrl]
+                         (reset! controller ctrl)
+                         (let [handle-chunk #(.enqueue ctrl (.encode encoder %))]
+                           (js* "window.__FLIGHT_DATA ||= []")
+                           (js* "window.__FLIGHT_DATA.forEach(~{})" handle-chunk)
+                           (js* "window.__FLIGHT_DATA.push = ~{}" handle-chunk)))})
+         #js {:moduleBaseURL "/"}))))
+
+#?(:cljs
    (defui router
      ;; link pressed -> url change -> request server render -> update DOM
      [{:keys [routes rsc-endpoint server-actions-endpoint]}]
@@ -38,21 +54,21 @@
                                          :headers #js {:content-type "text/edn"}})
                                   #js {:moduleBaseURL "/"})
                                [rsc-endpoint])
-           [children set-children] (uix/use-state nil)
-           navigate (uix/use-callback
-                      #(-> (create-from-fetch {:path %})
-                           (.then set-children))
-                      [create-from-fetch])
            router (uix/use-memo #(rf/router routes)
                                 [routes])
            [route set-route] (uix/use-state #(r/match-by-path router js/location.pathname))
-           path (:path route)
+           [resource set-resource] (uix/use-state create-initial-flight-stream)
+           navigate (uix/use-callback
+                      (fn [path] (uix/start-transition #(set-resource (create-from-fetch {:path path}))))
+                      [create-from-fetch])
            _ (uix/use-memo
-               #(rfe/start! router set-route {:use-fragment false})
-               [router])
-           _ (uix/use-memo #(navigate path) [navigate path])]
+               #(rfe/start! router (fn [route]
+                                     (navigate (:path route))
+                                     (set-route route))
+                            {:use-fragment false})
+               [router navigate])]
        ($ router-context {:value {:route route :navigate navigate}}
-          children))))
+          (uix/use resource)))))
 
 (defui link [props]
   #?(:clj ($ :a props)
@@ -128,3 +144,10 @@
      "Renders UIx components into React Flight payload"
      [src {:keys [on-chunk] :as opts}]
      (server.flight/render-to-flight-stream src opts)))
+
+#?(:clj
+   (defn render-to-html-stream
+     [src {:keys [on-html on-chunk] :as opts}]
+     (let [ast (server.flight/-unwrap src)]
+       (on-html (dom.server/render-to-string ast))
+       (render-to-flight-stream ast opts))))
