@@ -8,6 +8,7 @@ resources/public/benchmark.js
 target
 .rebel_readline_history
 out
+rsc-out
 index.html
 node_modules
 server_render_test

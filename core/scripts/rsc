@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+
+set -e
+set -o pipefail
+
+echo "Installing NPM deps..."
+npm ci
+
+echo "<link rel=\"stylesheet\" href=\"/rsc-out/main.css\"><div id=root></div><script src=\"/rsc-out/rsc.js\"></script>" > index.html
+
+echo "Starting examples build server..."
+npx concurrently "npx patch-package && clojure -A:examples -M -m shadow.cljs.devtools.cli watch rsc" "npx @tailwindcss/cli -i ./dev/uix/main.css -o ./rsc-out/main.css --watch"
