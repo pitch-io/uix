@@ -24,7 +24,11 @@
      (:navigate (uix/use router-context))))
 
 #?(:cljs
-   (defonce server-actions-endpoint- (atom nil)))
+   (do
+     (defonce ^:private rsc-cache (atom {}))
+     (defonce ^:private server-actions-endpoint- (atom nil))
+     (defonce ^:private rsc-endpoint- (atom nil))
+     (defonce ^:private router- (atom nil))))
 
 #?(:cljs
    (defn- create-initial-flight-stream []
@@ -42,44 +46,60 @@
          #js {:moduleBaseURL "/"}))))
 
 #?(:cljs
+   (defn- create-from-fetch [route]
+     (rsd-client/createFromFetch
+       (js/fetch @rsc-endpoint-
+         #js {:method "POST"
+              :body (str {:route route})
+              :headers #js {:content-type "text/edn"}})
+       #js {:moduleBaseURL "/"})))
+
+#?(:cljs
+   (defonce ^:private init-rsc (create-initial-flight-stream)))
+
+#?(:cljs
    (defui router
      ;; link pressed -> url change -> request server render -> update DOM
      [{:keys [routes rsc-endpoint server-actions-endpoint]}]
+     (reset! rsc-endpoint- rsc-endpoint)
      (reset! server-actions-endpoint- server-actions-endpoint)
-     (let [create-from-fetch (uix/use-callback
-                               #(rsd-client/createFromFetch
-                                  (js/fetch rsc-endpoint
-                                    #js {:method "POST"
-                                         :body (str {:route %})
-                                         :headers #js {:content-type "text/edn"}})
-                                  #js {:moduleBaseURL "/"})
-                               [rsc-endpoint])
-           router (uix/use-memo #(rf/router routes)
+     (let [initialized? (uix/use-ref false)
+           router (uix/use-memo #(reset! router- (rf/router routes))
                                 [routes])
            [route set-route] (uix/use-state #(r/match-by-path router js/location.pathname))
-           [resource set-resource] (uix/use-state create-initial-flight-stream)
-           navigate (uix/use-callback
-                      (fn [path] (uix/start-transition #(set-resource (create-from-fetch {:path path}))))
-                      [create-from-fetch])
+           [resource set-resource] (uix/use-state init-rsc)
+           on-navigate (uix/use-effect-event
+                         (fn [route]
+                           (when @initialized?
+                             (let [path (:path route)
+                                   resource (or (@rsc-cache path)
+                                                (create-from-fetch {:path path}))]
+                               (swap! rsc-cache dissoc path)
+                               (uix/start-transition #(set-resource resource))
+                               (set-route route)))
+                           (reset! initialized? true)))
            _ (uix/use-memo
-               #(rfe/start! router (fn [route]
-                                     (navigate (:path route))
-                                     (set-route route))
-                            {:use-fragment false})
-               [router navigate])]
-       ($ router-context {:value {:route route :navigate navigate}}
-          (uix/use resource)))))
+               #(rfe/start! router on-navigate {:use-fragment false})
+               [router])]
+       ($ router-context {:value {:route route}}
+         resource))))
 
-(defui link [props]
+#?(:cljs
+   (defn- prefetch [href]
+     (when (r/match-by-path @router- href)
+       (when-not (@rsc-cache href)
+         (swap! rsc-cache assoc href (create-from-fetch {:path href}))))))
+
+(defui ^:client link [props]
   #?(:clj ($ :a props)
      :cljs
      ;; wip
-      (let [navigate (use-navigate)]
-        (prn props)
-        ($ :a (update props :on-click
-                      (fn [handler]
-                        (fn [e]
-                          (when handler (handler e)))))))))
+      (let [wrap-handler (fn [handler f]
+                           (fn [e]
+                             (when handler (handler e))
+                             (f e)))]
+        ($ :a (-> props
+                  (update :on-mouse-enter wrap-handler #(prefetch (:href props))))))))
 
 #?(:clj
    (defmacro defroutes [name routes]

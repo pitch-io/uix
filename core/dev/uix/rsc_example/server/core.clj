@@ -1,5 +1,6 @@
 (ns uix.rsc-example.server.core
-  (:require [clojure.edn :as edn]
+  (:require [cheshire.core :as json]
+            [clojure.edn :as edn]
             [clojure.java.io :as io]
             [uix.core :refer [defui $] :as uix]
             [uix.rsc :as rsc]
@@ -40,7 +41,7 @@
                   (let [on-chunk (fn [chunk]
                                    (if (= chunk :done)
                                      (server/close ch)
-                                     (server/send! ch (str "<script>(window.__FLIGHT_DATA ||=[]).push(`" chunk "`);</script>") false)))
+                                     (server/send! ch (str "<script>(window.__FLIGHT_DATA ||=[]).push(" (json/generate-string chunk) ");</script>") false)))
                         on-html (fn [html]
                                   (server/send! ch "<link rel=\"stylesheet\" href=\"/rsc-out/main.css\"><div id=root>" false)
                                   (server/send! ch html false)

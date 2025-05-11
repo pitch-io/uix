@@ -30,7 +30,7 @@
          " | "
           ;; todo: convert server action to client ref
           ;; ($ ui/vote-btn {:on-click actions/vote} ...)
-         ($ ui/vote-btn {:id id :score score :on-click ui/say-hi})
+         ($ ui/vote-btn {:id id :score score})
          " | "
          ($ :div
             (to-locale-string (* 1e3 time)))

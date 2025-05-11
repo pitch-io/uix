@@ -110,18 +110,18 @@
   IPersistentVector
   (-unwrap [this]
     (if (vector? (first this))
-      (map -unwrap this)
+      (seq (map -unwrap this))
       (unwrap-element this)))
   (-render [this sb]
     (if (vector? (first this))
-      (map #(-render % sb) this)
+      (seq (map #(-render % sb) this))
       (render-element! this sb)))
 
   ISeq
   (-unwrap [this]
-    (map -unwrap this))
+    (seq (map -unwrap this)))
   (-render [this sb]
-    (map #(-render % sb) this))
+    (seq (map #(-render % sb) this)))
 
   String
   (-unwrap [this]
@@ -181,10 +181,10 @@
        "\n"))
 
 (defn render-to-flight-stream [src {:keys [on-chunk]}]
-  (let [sb (atom {:id 0
+  (let [sb (atom {:id -1
                   :pending {}
                   :imports {}})
-        root-row (emit-row 0 (-render src sb))
+        root-row (emit-row (get-id sb) (-render src sb))
         imports (->> (:imports @sb)
                      (map #(apply emit-row %)))]
     ;; flight stream structure
