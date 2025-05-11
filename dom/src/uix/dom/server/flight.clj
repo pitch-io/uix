@@ -23,25 +23,33 @@
       (cond-> attrs (seq children) (assoc :children children))
       {:children (into [attrs] children)})))
 
+(defn- get-cached-id [sb key value]
+  (or (->> @sb key (some (fn [[id v]] (when (= v value) id))))
+      (let [id (get-id sb)]
+        (swap! sb update key assoc id value)
+        id)))
+
 (defn- with-client-refs [sb props]
   (let [refs (atom {})]
     [(walk/postwalk
        (fn [form]
          (cond
            ;; server action as prop to client comp
-           (fn? form)
-           (if-let [action-id (:uix.rsc/action-id (meta form))]
-             (str "$F:" action-id)
-             form)
+           (and (fn? form)
+                (:uix.rsc/action-id (meta form)))
+           (let [action-id (:uix.rsc/action-id (meta form))
+                 ref-fn {:id action-id}
+                 id (get-cached-id sb :refs ref-fn)
+                 ref-id (str "$F" id)
+                 _ (swap! refs assoc ref-id ref-id)]
+             ref-id)
 
            ;; server comp as prop to client comp
            (and (vector? form)
                 (:uix/element? (meta form)))
            (let [ref-el (-render form sb)
-                 id (or (->> @sb :refs (some (fn [[id v]] (when (= v ref-el) id))))
-                        (get-id sb))
+                 id (get-cached-id sb :refs ref-el)
                  ref-id (str "$" id)
-                 _ (swap! sb update :refs assoc id ref-el)
                  _ (swap! refs assoc ref-id ref-id)]
              ref-id)
 
@@ -59,11 +67,7 @@
   (let [rsc-id (:rsc/id (meta tag))
         [props refs] (with-client-refs sb (normalize-props el))
         ref-import (str "I" (json/generate-string ["rsc" rsc-id false]))
-        ;; dedupe client refs
-        id (or (->> @sb :imports (some (fn [[id v]] (when (= v ref-import) id))))
-               (let [id (get-id sb)]
-                 (swap! sb update :imports assoc id ref-import)
-                 id))]
+        id (get-cached-id sb :imports ref-import)]
     ["$" (str "$L" id)
      (:key props)
      (cond-> {}

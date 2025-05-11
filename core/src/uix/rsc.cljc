@@ -22,14 +22,6 @@
                         (fn [form]
                           ;; todo: maybe use data readers?
                           (cond
-                            (and (string? form) (.startsWith form "$F:"))
-                            (let [action-id (.replace form "$F:" "")
-                                  action (aget (.-RSC_MODULES js/window) action-id)]
-                              (when ^boolean goog/DEBUG
-                                (when (nil? action)
-                                  (js/console.error "action " action-id " is not registered")))
-                              action)
-
                             (and (string? form)
                                  (.startsWith form "$")
                                  rsc-refs)
@@ -70,6 +62,17 @@
      (defonce ^:private router- (atom nil))))
 
 #?(:cljs
+   (defn- exec-server-action [id args]
+     (if-let [endpoint @server-actions-endpoint-]
+       (-> (js/fetch endpoint
+                 #js {:method "POST"
+                          :body (str {:action id :args (vec args)})
+                          :headers #js {:content-type "text/edn"}})
+           (.then #(.text %))
+           (.then #(edn/read-string %)))
+       (js/Promise.reject "server-action-fn is not set"))))
+
+#?(:cljs
    (defn- create-initial-flight-stream []
      (let [controller (atom nil)
            encoder (js/TextEncoder.)]
@@ -82,7 +85,8 @@
                            (js* "window.__FLIGHT_DATA ||= []")
                            (js* "window.__FLIGHT_DATA.forEach(~{})" handle-chunk)
                            (js* "window.__FLIGHT_DATA.push = ~{}" handle-chunk)))})
-         #js {:moduleBaseURL "/"}))))
+         #js {:moduleBaseURL "/"
+              :callServer exec-server-action}))))
 
 #?(:cljs
    (defn- create-from-fetch [route]
@@ -169,16 +173,7 @@
 
 #?(:cljs
    (defn create-server-ref [id]
-     (rsd-client/createServerReference id
-       (fn [id args]
-         (if-let [endpoint @server-actions-endpoint-]
-           (-> (js/fetch endpoint
-                 #js {:method "POST"
-                      :body (str {:action id :args (vec args)})
-                      :headers #js {:content-type "text/edn"}})
-               (.then #(.text %))
-               (.then #(edn/read-string %)))
-           (js/Promise.reject "server-action-fn is not set"))))))
+     (rsd-client/createServerReference id exec-server-action)))
 
 #?(:clj
    (defmacro defaction
