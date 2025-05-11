@@ -2,13 +2,42 @@
   #?(:cljs (:require-macros [uix.rsc]))
   (:require #?@(:cljs [["@kentcdodds/tmp-react-server-dom-esm/client" :as rsd-client]
                        [clojure.edn :as edn]
+                       [clojure.walk :as walk]
                        [reitit.core :as r]
                        [reitit.frontend :as rf]
                        [reitit.frontend.easy :as rfe]])
-            #?@(:clj [[uix.dom.server :as dom.server]
+            #?@(:clj [[cheshire.core :as json]
+                      [uix.dom.server :as dom.server]
                       [uix.dom.server.flight :as server.flight]
                       [uix.lib :as lib]])
             [uix.core :refer [defui $] :as uix]))
+
+#?(:cljs
+   (defn- create-rsc-client-container [uix-comp]
+     (fn [props]
+       (let [uix-props (aget props "rsc/props")
+             props (uix/use-memo
+                     #(walk/postwalk
+                        (fn [form]
+                          (if (and (string? form) (.startsWith form "$F:"))
+                            (let [action-id (.replace form "$F:" "")
+                                  action (aget (.-RSC_MODULES js/window) action-id)]
+                              (when (nil? action)
+                                (js/console.error "action " action-id " is not registered"))
+                              action)
+                            form))
+                        (edn/read-string uix-props))
+                     [uix-props])]
+         (uix.core/$ uix-comp props)))))
+
+#?(:cljs
+   (defn ^{:jsdoc ["@nosideeffects"]} register-rsc-client! [str-name ref]
+     (js* "window.RSC_MODULES ||= {}")
+     (if (.-uix-component? ^js ref)
+       (let [comp (create-rsc-client-container ref)]
+         (set! (.-displayName comp) (str "rsc(" str-name ")"))
+         (aset (.-RSC_MODULES js/window) str-name comp))
+       (aset (.-RSC_MODULES js/window) str-name ref))))
 
 ;; Router =============
 
@@ -18,10 +47,6 @@
 #?(:cljs
    (defn use-route []
      (:route (uix/use router-context))))
-
-#?(:cljs
-   (defn use-navigate []
-     (:navigate (uix/use router-context))))
 
 #?(:cljs
    (do
@@ -97,8 +122,23 @@
       (let [wrap-handler (fn [handler f]
                            (fn [e]
                              (when handler (handler e))
-                             (f e)))]
+                             (f e)))
+            href (:href props)
+            ref (uix/use-ref)]
+
+        (uix/use-effect
+          (fn []
+            (let [node @ref
+                  observer (js/IntersectionObserver.
+                             (fn [entries]
+                               (doseq [entry entries]
+                                 (when (.-isIntersecting entry)
+                                   (prefetch href)))))]
+              (.observe observer node)
+              #(.unobserve observer node)))
+          [href])
         ($ :a (-> props
+                  (assoc :ref ref)
                   (update :on-mouse-enter wrap-handler #(prefetch (:href props))))))))
 
 #?(:clj
@@ -136,10 +176,11 @@
        (let [id (-> (str (-> &env :ns :name) "/" name) symbol str)]
          `(let [handler# (create-server-ref ~id)]
             (defn ~name [& args#]
-              (apply handler# args#))))
+              (apply handler# args#))
+            (register-rsc-client! ~id ~name)))
        (let [id (-> (str *ns* "/" name) symbol str)
              name (vary-meta name assoc ::action-id id)]
-         `(defn ~name ~args ~@body)))))
+         `(def ~name ~(with-meta `(fn ~args ~@body) {::action-id id}))))))
 
 #?(:clj
    (defn- all-actions []
@@ -168,6 +209,9 @@
 #?(:clj
    (defn render-to-html-stream
      [src {:keys [on-html on-chunk] :as opts}]
-     (let [ast (server.flight/-unwrap src)]
+     (let [on-chunk #(if (= :done %)
+                       (on-chunk :done)
+                       (on-chunk (str "<script>(window.__FLIGHT_DATA ||=[]).push(" (json/generate-string %) ");</script>")))
+           ast (server.flight/-unwrap src)]
        (on-html (dom.server/render-to-string ast))
-       (render-to-flight-stream ast opts))))
+       (render-to-flight-stream ast {:on-chunk on-chunk}))))

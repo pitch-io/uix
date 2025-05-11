@@ -1,6 +1,5 @@
 (ns uix.rsc-example.server.core
-  (:require [cheshire.core :as json]
-            [clojure.edn :as edn]
+  (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [uix.core :refer [defui $] :as uix]
             [uix.rsc :as rsc]
@@ -9,7 +8,7 @@
             [compojure.route :as route]
             [ring.util.response :as resp]
             [reitit.core :as r]
-            [uix.rsc-example.server.root :refer [root]]
+            [uix.rsc-example.server.root :as server.root]
             [uix.rsc-example.routes :refer [routes]])
   (:import (java.io PushbackReader))
   (:gen-class))
@@ -31,7 +30,7 @@
                                    (if (= chunk :done)
                                      (server/close ch)
                                      (server/send! ch chunk false)))]
-                    (rsc/render-to-flight-stream ($ root {:route route})
+                    (rsc/render-to-flight-stream ($ server.root/page {:route route})
                                                  {:on-chunk on-chunk})))})))
 
 (defn html-handler [request]
@@ -41,14 +40,22 @@
                   (let [on-chunk (fn [chunk]
                                    (if (= chunk :done)
                                      (server/close ch)
-                                     (server/send! ch (str "<script>(window.__FLIGHT_DATA ||=[]).push(" (json/generate-string chunk) ");</script>") false)))
+                                     (server/send! ch chunk false)))
                         on-html (fn [html]
-                                  (server/send! ch "<link rel=\"stylesheet\" href=\"/rsc-out/main.css\"><div id=root>" false)
-                                  (server/send! ch html false)
-                                  (server/send! ch "</div><script src=\"/rsc-out/rsc.js\"></script>" false))]
-                    (rsc/render-to-html-stream ($ root {:route route})
+                                  (server/send! ch html false))]
+                    (rsc/render-to-html-stream ($ server.root/page {:route route})
                                                {:on-chunk on-chunk
                                                 :on-html on-html})))})))
+
+(defn handle-server-action [body]
+  (try
+    (-> (rsc/handle-action (read-end-stream body))
+        str
+        (resp/response)
+        (resp/header "Content-Type" "text/edn"))
+    (catch Exception e
+      (-> (resp/bad-request (ex-message e))
+          (resp/header "Content-Type" "text/edn")))))
 
 (defroutes server-routes*
   ;; react flight payload endpoint
@@ -56,22 +63,12 @@
     (rsc-handler req))
   ;; server actions endpoint
   (POST "/api" {body :body}
-    (try
-      (-> (rsc/handle-action (read-end-stream body))
-          str
-          (resp/response)
-          (resp/header "Content-Type" "text/edn"))
-      (catch Exception e
-        (-> (resp/bad-request (ex-message e))
-            (resp/header "Content-Type" "text/edn")))))
+    (handle-server-action body))
   ;; static assets
   (route/files "/" {:root "./"})
-  ;; always serving index.html instead of 404
+  ;; generating HTML for initial load of a route
   (GET "/*" req
-    (html-handler req)
-    ;; todo: render flight payload into html on initial load
-    #_(-> (resp/file-response "index.html" {:root "./"})
-          (resp/header "Content-Type" "text/html")))
+    (html-handler req))
   (resp/not-found "404"))
 
 (defn start-server []

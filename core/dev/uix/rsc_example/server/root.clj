@@ -19,3 +19,11 @@
                 title))))
       ($ :div.max-w-128
          ($ component {:path path :params path-params})))))
+
+(defui page [{:keys [route]}]
+  ($ :html
+    ($ :head
+      ($ :link {:rel :stylesheet :href "/rsc-out/main.css"}))
+    ($ :body
+      ($ root {:route route})
+      ($ :script {:src "/rsc-out/rsc.js"}))))

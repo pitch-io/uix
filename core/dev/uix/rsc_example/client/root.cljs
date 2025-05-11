@@ -5,7 +5,7 @@
 
 (defn init []
   (dom.rsc/render-root
-    {:container (js/document.getElementById "root")
+    {:container js/document
      :routes routes
      :rsc-endpoint "/rsc"
      :server-actions-endpoint "/api"}))

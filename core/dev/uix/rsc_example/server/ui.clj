@@ -1,6 +1,7 @@
 (ns uix.rsc-example.server.ui
   (:require [uix.core :refer [defui $] :as uix]
             [uix.rsc :as rsc]
+            [uix.rsc-example.actions :as actions]
             [uix.rsc-example.server.services :as services]
             [uix.rsc-example.client.ui :as ui])
   (:import (java.util Locale)
@@ -28,9 +29,7 @@
          ($ :div "by "
             ($ :span.font-medium by))
          " | "
-          ;; todo: convert server action to client ref
-          ;; ($ ui/vote-btn {:on-click actions/vote} ...)
-         ($ ui/vote-btn {:id id :score score})
+         ($ ui/vote-btn {:id id :score score :on-click actions/vote})
          " | "
          ($ :div
             (to-locale-string (* 1e3 time)))

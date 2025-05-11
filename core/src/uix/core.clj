@@ -131,7 +131,7 @@
            ~(when memo?
               `(def ~fname (uix.core/memo ~memo-sym)))
            ~(when rsc-client?
-              `(register-rsc-client! ~(str var-sym) ~(if memo? fname memo-fname)))))
+              `(uix.rsc/register-rsc-client! ~(str var-sym) ~(if memo? fname memo-fname)))))
       (let [args-sym (gensym "args")
             [args dissoc-ks rest-sym] (uix.lib/rest-props args)
             rsc-id (str *ns* "/" fname)]

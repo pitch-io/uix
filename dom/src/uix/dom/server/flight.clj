@@ -1,5 +1,6 @@
 (ns uix.dom.server.flight
   (:require [clojure.string :as str]
+            [clojure.walk :as walk]
             [uix.compiler.attributes :as attrs]
             [uix.core :refer [$ defui]]
             [uix.dom.server :as dom.server]
@@ -22,13 +23,23 @@
       (cond-> attrs (seq children) (assoc :children children))
       {:children (into [attrs] children)})))
 
+(defn- with-client-refs [sb props]
+  (walk/postwalk
+    (fn [form]
+      (if (fn? form)
+        (if-let [action-id (:uix.rsc/action-id (meta form))]
+          (str "$F:" action-id)
+          form)
+        form))
+    props))
+
 (defn render-component-element-client-ref
   "input: ($ var-name 'hello')
    output: I:['rsc' 'var-name' false]
-           [$ $L key props]"
+       e    [$ $L key props]"
   [[tag :as el] sb]
   (let [rsc-id (:rsc/id (meta tag))
-        {:keys [children] :as props} (normalize-props el)
+        {:keys [children] :as props} (with-client-refs sb (normalize-props el))
         ref-import (str "I" (json/generate-string ["rsc" rsc-id false]))
         ;; dedupe client refs
         id (or (->> @sb :imports (some (fn [[id v]] (when (= v ref-import) id))))
@@ -185,8 +196,7 @@
                   :pending {}
                   :imports {}})
         root-row (emit-row (get-id sb) (-render src sb))
-        imports (->> (:imports @sb)
-                     (map #(apply emit-row %)))]
+        imports (map #(apply emit-row %) (:imports @sb))]
     ;; flight stream structure
     ;; 1. imports/client refs
     ;; 2. ui structure interleaved with async values
