@@ -24,22 +24,40 @@
       {:children (into [attrs] children)})))
 
 (defn- with-client-refs [sb props]
-  (walk/postwalk
-    (fn [form]
-      (if (fn? form)
-        (if-let [action-id (:uix.rsc/action-id (meta form))]
-          (str "$F:" action-id)
-          form)
-        form))
-    props))
+  (let [refs (atom {})]
+    [(walk/postwalk
+       (fn [form]
+         (cond
+           ;; server action as prop to client comp
+           (fn? form)
+           (if-let [action-id (:uix.rsc/action-id (meta form))]
+             (str "$F:" action-id)
+             form)
+
+           ;; server comp as prop to client comp
+           (and (vector? form)
+                (:uix/element? (meta form)))
+           (let [ref-el (-render form sb)
+                 id (or (->> @sb :refs (some (fn [[id v]] (when (= v ref-el) id))))
+                        (get-id sb))
+                 ref-id (str "$" id)
+                 _ (swap! sb update :refs assoc id ref-el)
+                 _ (swap! refs assoc ref-id ref-id)]
+             ref-id)
+
+           :else form))
+       props)
+     @refs]))
+
+(defn- serialize-props [sb {:keys [children] :as props}]
+  (str (cond-> (dissoc props :children :key)
+               (seq children)
+               (assoc :children (map #(-render % sb) children)))))
 
 (defn render-component-element-client-ref
-  "input: ($ var-name 'hello')
-   output: I:['rsc' 'var-name' false]
-       e    [$ $L key props]"
   [[tag :as el] sb]
   (let [rsc-id (:rsc/id (meta tag))
-        {:keys [children] :as props} (with-client-refs sb (normalize-props el))
+        [props refs] (with-client-refs sb (normalize-props el))
         ref-import (str "I" (json/generate-string ["rsc" rsc-id false]))
         ;; dedupe client refs
         id (or (->> @sb :imports (some (fn [[id v]] (when (= v ref-import) id))))
@@ -48,10 +66,9 @@
                  id))]
     ["$" (str "$L" id)
      (:key props)
-     {"rsc/props"
-      (str (cond-> (dissoc props :children :key)
-                   (seq children)
-                   (assoc :children (map #(-render % sb) children))))}]))
+     (cond-> {}
+             (seq refs) (assoc "rsc/refs" refs)
+             (seq props) (assoc "rsc/props" (serialize-props sb props)))]))
 
 (defn render-component-element-server [[tag :as el] sb]
   (let [props (normalize-props el)
@@ -194,15 +211,19 @@
 (defn render-to-flight-stream [src {:keys [on-chunk]}]
   (let [sb (atom {:id -1
                   :pending {}
-                  :imports {}})
+                  :imports {}
+                  :refs {}})
         root-row (emit-row (get-id sb) (-render src sb))
-        imports (map #(apply emit-row %) (:imports @sb))]
+        imports (map #(apply emit-row %) (:imports @sb))
+        refs (map #(apply emit-row %) (:refs @sb))]
     ;; flight stream structure
     ;; 1. imports/client refs
     ;; 2. ui structure interleaved with async values
     (async/go
       (doseq [import imports]
         (on-chunk import))
+      (doseq [ref refs]
+        (on-chunk ref))
       (on-chunk root-row)
       (loop [ch->id (->> @sb :pending vals (into {}))]
         (if (seq ch->id)

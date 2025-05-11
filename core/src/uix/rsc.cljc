@@ -15,19 +15,33 @@
 #?(:cljs
    (defn- create-rsc-client-container [uix-comp]
      (fn [props]
-       (let [uix-props (aget props "rsc/props")
+       (let [rsc-props (aget props "rsc/props")
+             rsc-refs (aget props "rsc/refs")
              props (uix/use-memo
                      #(walk/postwalk
                         (fn [form]
-                          (if (and (string? form) (.startsWith form "$F:"))
+                          ;; todo: maybe use data readers?
+                          (cond
+                            (and (string? form) (.startsWith form "$F:"))
                             (let [action-id (.replace form "$F:" "")
                                   action (aget (.-RSC_MODULES js/window) action-id)]
-                              (when (nil? action)
-                                (js/console.error "action " action-id " is not registered"))
+                              (when ^boolean goog/DEBUG
+                                (when (nil? action)
+                                  (js/console.error "action " action-id " is not registered")))
                               action)
-                            form))
-                        (edn/read-string uix-props))
-                     [uix-props])]
+
+                            (and (string? form)
+                                 (.startsWith form "$")
+                                 rsc-refs)
+                            (let [ref (aget rsc-refs form)]
+                              (when ^boolean goog/DEBUG
+                                (when (nil? ref)
+                                  (js/console.error "server reference " ref " is not registered")))
+                              ref)
+
+                            :else form))
+                        (edn/read-string rsc-props))
+                     [rsc-props rsc-refs])]
          (uix.core/$ uix-comp props)))))
 
 #?(:cljs

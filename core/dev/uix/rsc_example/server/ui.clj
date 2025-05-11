@@ -17,6 +17,9 @@
 (defn unescape-text [text]
   (StringEscapeUtils/unescapeHtml4 text))
 
+(defui label []
+  ($ :span "Vote"))
+
 (defui story [{:keys [data]}]
   (let [{:keys [id by score time title url kids]} data
         time (or time 0)]
@@ -29,7 +32,12 @@
          ($ :div "by "
             ($ :span.font-medium by))
          " | "
-         ($ ui/vote-btn {:id id :score score :on-click actions/vote})
+          ;; todo: server comp type as prop
+         ($ ui/vote-btn
+            {:id id
+             :score score
+             :label ($ label)
+             :on-click actions/vote})
          " | "
          ($ :div
             (to-locale-string (* 1e3 time)))
