@@ -38,7 +38,7 @@
          (uix.core/$ uix-comp props)))))
 
 #?(:cljs
-   (defn ^{:jsdoc ["@nosideeffects"]} register-rsc-client! [str-name ref]
+   (defn register-rsc-client! [str-name ref]
      (js* "window.RSC_MODULES ||= {}")
      (if (.-uix-component? ^js ref)
        (let [comp (create-rsc-client-container ref)]
@@ -67,8 +67,8 @@
      (if-let [endpoint @server-actions-endpoint-]
        (-> (js/fetch endpoint
                  #js {:method "POST"
-                          :body (str {:action id :args (vec args)})
-                          :headers #js {:content-type "text/edn"}})
+                      :body (str {:action id :args (vec args)})
+                      :headers #js {:content-type "text/edn"}})
            (.then #(.text %))
            (.then #(edn/read-string %)))
        (js/Promise.reject "server-action-fn is not set"))))
@@ -84,7 +84,7 @@
                          (reset! controller ctrl)
                          (let [handle-chunk #(.enqueue ctrl (.encode encoder %))]
                            (js* "(window.__FLIGHT_DATA ||= []).forEach(~{})" handle-chunk)
-                           (js* "window.__FLIGHT_DATA.push = ~{}" handle-chunk)))})
+                           (set! (.. js/window -__FLIGHT_DATA -push) handle-chunk)))})
          #js {:moduleBaseURL "/"
               :callServer exec-server-action}))))
 
@@ -92,7 +92,8 @@
    (defn- create-from-fetch [route & {:keys [priority]}]
      (rsd-client/createFromFetch
        (js/fetch (str @rsc-endpoint- "?path=" (:path route)) #js {:priority (or priority "auto")})
-       #js {:moduleBaseURL "/"})))
+       #js {:moduleBaseURL "/"
+            :callServer exec-server-action})))
 
 #?(:cljs
    (defn- init-rsc [ssr-enabled]
