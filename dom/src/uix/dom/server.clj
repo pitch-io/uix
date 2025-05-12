@@ -451,9 +451,14 @@
                    (cons attrs children))]
     (-render-html children *state sb)))
 
-(defn render-suspense! [element]
-  (binding [*out* *err*]
-    (prn (str "React.Suspense elements are not supported on JVM, skipping: " element))))
+;; with streaming ssr with suspense
+(defn render-suspense! [[_ {:keys [id fallback]}] *state sb]
+  (vreset! *state nil)
+  (append! sb (str "<!--$?--><template id='" id "'></template>"))
+  (vreset! *state nil)
+  (-render-html fallback *state sb)
+  (vreset! *state nil)
+  (append! sb "<!--/$-->"))
 
 (defn render-portal! [element]
   (binding [*out* *err*]
@@ -504,6 +509,7 @@
               children (seq (nth element 2 nil))]
           (binder #(-render-html children *state sb)))
         (identical? :<> tag) (render-fragment! element *state sb)
+        (identical? :uix.core/suspense tag) (render-suspense! element *state sb)
         (keyword? tag) (render-html-element! element *state sb)
         :else (render-component! element *state sb)))))
 
@@ -533,6 +539,9 @@
   Object
   (-render-html [this *state sb]
     (-render-html (str this) *state sb))
+
+  clojure.lang.Atom
+  (-render-html [this *state sb])
 
   nil
   (-render-html [this *state sb]

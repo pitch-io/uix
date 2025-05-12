@@ -9,7 +9,7 @@
   (:import [clojure.lang IBlockingDeref IPersistentVector ISeq]))
 
 (defprotocol FlightRenderer
-  (-unwrap [this]
+  (-unwrap [this sb]
     "Unwraps component tree into data representation")
   (-render [this sb]
     "Renders a type into React Flight format"))
@@ -84,6 +84,11 @@
 (defn client-component? [tag]
   (:client (meta tag)))
 
+(defn- render-props [attrs children sb]
+  (cond-> (attrs/compile-attrs (dissoc attrs :children :key))
+          (seq children)
+          (assoc :children (map #(-render % sb) children))))
+
 (defn render-dom-element
   "input: ($ :h1 'hello')
    output: [$ h1 key props]"
@@ -91,9 +96,7 @@
   (let [[tag attrs children] (dom.server/normalize-element element)]
     ["$" (name tag)
      (:key attrs)
-     (cond-> (attrs/compile-attrs (dissoc attrs :children :key))
-             (seq children)
-             (assoc :children (map #(-render % sb) children)))]))
+     (render-props attrs children sb)]))
 
 (defn render-fragment-element
   "input: ($ :<> el1 el2 ...)
@@ -104,72 +107,99 @@
                    (cons attrs children))]
     (-render children sb)))
 
+(defn render-suspense-element [[_ {:keys [fallback children]}] sb]
+  ["$" "$Sreact.suspense"
+   nil
+   {:fallback (-render fallback sb)
+    :children children}])
+
 (defn render-element!
   [[tag :as el] sb]
   (cond
     (client-component? tag) (render-component-element-client-ref el sb)
     (fn? tag) (render-component-element-server el sb)
     (= :<> tag) (render-fragment-element el sb)
+    (= :uix.core/suspense tag) (render-suspense-element el sb)
     (keyword? tag) (render-dom-element el sb)
     :else (throw (IllegalArgumentException. (str (type tag) " " tag " is not a valid element type")))))
 
-(defn unwrap-component-element [[tag :as el]]
+(defn- unwrap-component-element [[tag :as el] sb]
   (let [props (normalize-props el)
         v (if (seq props)
             (tag props)
             (tag))]
-    (-unwrap v)))
+    (-unwrap v sb)))
 
-(defn unwrap-fragment-element [[tag attrs & children]]
+(defn- unwrap-fragment-element [[tag attrs & children] sb]
   (let [children (if (map? attrs)
                    children
                    (cons attrs children))]
-    (-unwrap children)))
+    (-unwrap children sb)))
 
-(defn unwrap-dom-element [el]
+(defn- unwrap-dom-element [el sb]
   (let [[tag attrs children] (dom.server/normalize-element el)]
-    (into [(keyword tag) attrs] (map -unwrap children))))
+    (into [(keyword tag) attrs] (map #(-unwrap % sb) children))))
 
-(defn unwrap-element [[tag :as el]]
+(defn serialize-blocking [this sb key tag]
+  (when-not (contains? (key @sb) this)
+    (let [id (get-id sb)
+          ch (async/go
+               (try
+                 @this
+                 (catch Throwable e
+                   e)))]
+      (swap! sb update key assoc this [ch id])))
+  (let [[_ id] (get (key @sb) this)]
+    (str tag id)))
+
+(defn- unwrap-suspense-element [[tag {:keys [fallback children]}] sb]
+  (let [futures (map #(future (-unwrap % sb)) children)
+        tags (seq (map #(serialize-blocking % sb :suspended "$L") futures))]
+    [tag {:id (str (gensym))
+          :fallback (-unwrap fallback sb)
+          :children tags}]))
+
+(defn unwrap-element [[tag :as el] sb]
   (cond
     (client-component? tag) el
-    (fn? tag) (unwrap-component-element el)
-    (= :<> tag) (unwrap-fragment-element el)
-    (keyword? tag) (unwrap-dom-element el)
+    (fn? tag) (unwrap-component-element el sb)
+    (= :<> tag) (unwrap-fragment-element el sb)
+    (= :uix.core/suspense tag) (unwrap-suspense-element el sb)
+    (keyword? tag) (unwrap-dom-element el sb)
     :else (throw (IllegalArgumentException. (str (type tag) " " tag " is not a valid element type")))))
 
 (extend-protocol FlightRenderer
   IPersistentVector
-  (-unwrap [this]
+  (-unwrap [this sb]
     (if (vector? (first this))
-      (seq (map -unwrap this))
-      (unwrap-element this)))
+      (seq (map #(-unwrap % sb) this))
+      (unwrap-element this sb)))
   (-render [this sb]
     (if (vector? (first this))
       (seq (map #(-render % sb) this))
       (render-element! this sb)))
 
   ISeq
-  (-unwrap [this]
-    (seq (map -unwrap this)))
+  (-unwrap [this sb]
+    (seq (map #(-unwrap % sb) this)))
   (-render [this sb]
     (seq (map #(-render % sb) this)))
 
   String
-  (-unwrap [this]
+  (-unwrap [this sb]
     this)
   (-render [this sb]
     this)
 
   Object
-  (-unwrap [this]
-    (-unwrap (str this)))
+  (-unwrap [this sb]
+    (-unwrap (str this) sb))
   (-render [this sb]
     (-render (str this) sb))
 
   Throwable
   ;; throwable serializer
-  (-unwrap [this]
+  (-unwrap [this sb]
     this)
   (-render [this sb]
     (str "E" (json/generate-string
@@ -181,27 +211,21 @@
   ;; async values serializer
   ;; and continues rendering while blocking operation
   ;; runs concurrently
-  ;; todo: support pending components
-  (-unwrap [this]
-    ;; todo: maybe should not be empty
-    @this)
+  ;; todo: async value can be any prop
+  (-unwrap [this sb]
+    (atom (serialize-blocking this sb :pending "$@")))
   (-render [this sb]
-    (when-not (contains? (:pending @sb) this)
-      (let [id (get-id sb)
-            ch (async/go
-                 (try
-                   @this
-                   (catch Throwable e
-                     e)))]
-        (swap! sb update :pending assoc this [ch id])))
-    (let [[_ id] (get (:pending @sb) this)]
-      (str "$@" id)))
+    nil)
+
+  clojure.lang.Atom
+  (-render [this sb]
+    (-render @this sb))
 
   nil
-  (-unwrap [this]
-    :nop)
+  (-unwrap [this sb]
+    nil)
   (-render [this sb]
-    :nop))
+    nil))
 
 (defn emit-row [id src]
   (str id ":"
@@ -212,22 +236,23 @@
          (json/generate-string src))
        "\n"))
 
-(defn render-to-flight-stream [src {:keys [on-chunk]}]
-  (let [sb (atom {:id -1
-                  :pending {}
-                  :imports {}
-                  :refs {}})
-        root-row (emit-row (get-id sb) (-render src sb))
-        imports (map #(apply emit-row %) (:imports @sb))
-        refs (map #(apply emit-row %) (:refs @sb))]
+(defn create-state []
+  (atom {:id 0
+         :pending {}
+         :suspended {}
+         :imports {}
+         :refs {}}))
+
+(defn render-to-flight-stream [src {:keys [on-chunk sb]}]
+  (let [sb (or sb (create-state))
+        root-row (emit-row 0 (-render src sb))
+        imports (mapv #(apply emit-row %) (:imports @sb))
+        refs (mapv #(apply emit-row %) (:refs @sb))]
     ;; flight stream structure
     ;; 1. imports/client refs
     ;; 2. ui structure interleaved with async values
     (async/go
-      (doseq [import imports]
-        (on-chunk import))
-      (doseq [ref refs]
-        (on-chunk ref))
+      (on-chunk (str/join "" (into imports refs)))
       (on-chunk root-row)
       (loop [ch->id (->> @sb :pending vals (into {}))]
         (if (seq ch->id)

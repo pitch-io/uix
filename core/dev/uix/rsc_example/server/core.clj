@@ -59,6 +59,7 @@
 
 (defroutes server-routes*
   ;; react flight payload endpoint
+  ;; todo: should be cacheable GET request
   (POST "/rsc" req
     (rsc-handler req))
   ;; server actions endpoint

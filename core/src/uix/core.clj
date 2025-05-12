@@ -359,8 +359,8 @@
      (uix.linter/lint-exhaustive-deps! &env &form f deps))
    `(uix.hooks.alpha/use-imperative-handle ~ref ~f ~(->js-deps deps))))
 
-(defui suspense [{:keys [children]}]
-  children)
+(defui suspense [{:keys [fallback children] :as props}]
+  [::suspense props])
 
 (defui strict-mode [{:keys [children]}]
   children)

@@ -218,9 +218,11 @@
 #?(:clj
    (defn render-to-html-stream
      [src {:keys [on-html on-chunk] :as opts}]
-     (let [on-chunk #(if (= :done %)
-                       (on-chunk :done)
-                       (on-chunk (str "<script>(window.__FLIGHT_DATA ||=[]).push(" (json/generate-string %) ");</script>")))
-           ast (server.flight/-unwrap src)]
+     (let [handle-chunk #(if (= :done %)
+                           (on-chunk :done)
+                           (on-chunk (str "<script>window.__FLIGHT_DATA.push(" (json/generate-string %) ");</script>")))
+           sb (server.flight/create-state)
+           ast (server.flight/-unwrap src sb)]
        (on-html (dom.server/render-to-string ast))
-       (render-to-flight-stream ast {:on-chunk on-chunk}))))
+       (on-chunk "<script>window.__FLIGHT_DATA ||= [];</script>")
+       (render-to-flight-stream ast {:on-chunk handle-chunk :sb sb}))))

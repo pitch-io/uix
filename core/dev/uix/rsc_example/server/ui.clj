@@ -20,6 +20,10 @@
 (defui label []
   ($ :span "Vote"))
 
+(defui span []
+  (Thread/sleep 1000)
+  ($ :span "yo mamma"))
+
 (defui story [{:keys [data]}]
   (let [{:keys [id by score time title url kids]} data
         time (or time 0)]
@@ -32,6 +36,8 @@
          ($ :div "by "
             ($ :span.font-medium by))
          " | "
+         #_($ uix/suspense {:fallback "loading span..."}
+             ($ span))
           ;; todo: server comp type as prop
          ($ ui/vote-btn
             {:id id
