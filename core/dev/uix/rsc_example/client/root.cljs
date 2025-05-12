@@ -7,5 +7,6 @@
   (dom.rsc/render-root
     {:container js/document
      :routes routes
-     :rsc-endpoint "/rsc"
-     :server-actions-endpoint "/api"}))
+     :rsc-endpoint "/_rsc"
+     :server-actions-endpoint "/api"
+     :ssr-enabled true}))

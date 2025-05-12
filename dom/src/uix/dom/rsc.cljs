@@ -12,11 +12,16 @@
   "container – root DOM element
    routes – reitit routes
    rsc-endpoint – endpoint that generates React Flight payload
-   server-actions-endpoint – endpoint that executes server actions"
-  [{:keys [container routes rsc-endpoint server-actions-endpoint]}]
-  (uix/start-transition
-    #(dom/hydrate-root container
-       ($ uix.rsc/router
-          {:routes routes
-           :rsc-endpoint rsc-endpoint
-           :server-actions-endpoint server-actions-endpoint}))))
+   server-actions-endpoint – endpoint that executes server actions
+   ssr-enabled - whether HTML for initial load should be rendered"
+  [{:keys [container routes rsc-endpoint server-actions-endpoint ssr-enabled]}]
+  (let [element ($ uix.rsc/router
+                   {:ssr-enabled ssr-enabled
+                    :routes routes
+                    :rsc-endpoint rsc-endpoint
+                    :server-actions-endpoint server-actions-endpoint})]
+    (uix/start-transition
+      #(if ssr-enabled
+         (dom/hydrate-root container element)
+         (dom/render-root element (dom/create-root container))))))
+

@@ -82,8 +82,7 @@
            #js {:start (fn [ctrl]
                          (reset! controller ctrl)
                          (let [handle-chunk #(.enqueue ctrl (.encode encoder %))]
-                           (js* "window.__FLIGHT_DATA ||= []")
-                           (js* "window.__FLIGHT_DATA.forEach(~{})" handle-chunk)
+                           (js* "(window.__FLIGHT_DATA ||= []).forEach(~{})" handle-chunk)
                            (js* "window.__FLIGHT_DATA.push = ~{}" handle-chunk)))})
          #js {:moduleBaseURL "/"
               :callServer exec-server-action}))))
@@ -91,26 +90,26 @@
 #?(:cljs
    (defn- create-from-fetch [route]
      (rsd-client/createFromFetch
-       (js/fetch @rsc-endpoint-
-         #js {:method "POST"
-              :body (str {:route route})
-              :headers #js {:content-type "text/edn"}})
+       (js/fetch (str @rsc-endpoint- "?path=" (:path route)))
        #js {:moduleBaseURL "/"})))
 
 #?(:cljs
-   (defonce ^:private init-rsc (create-initial-flight-stream)))
+   (defn- init-rsc [ssr-enabled]
+     (if ssr-enabled
+       (create-initial-flight-stream)
+       (create-from-fetch {:path js/location.pathname}))))
 
 #?(:cljs
    (defui router
      ;; link pressed -> url change -> request server render -> update DOM
-     [{:keys [routes rsc-endpoint server-actions-endpoint]}]
+     [{:keys [ssr-enabled routes rsc-endpoint server-actions-endpoint]}]
      (reset! rsc-endpoint- rsc-endpoint)
      (reset! server-actions-endpoint- server-actions-endpoint)
      (let [initialized? (uix/use-ref false)
            router (uix/use-memo #(reset! router- (rf/router routes))
                                 [routes])
            [route set-route] (uix/use-state #(r/match-by-path router js/location.pathname))
-           [resource set-resource] (uix/use-state init-rsc)
+           [resource set-resource] (uix/use-state #(init-rsc ssr-enabled))
            on-navigate (uix/use-effect-event
                          (fn [route]
                            (when @initialized?

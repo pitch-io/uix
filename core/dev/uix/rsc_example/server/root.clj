@@ -26,4 +26,5 @@
       ($ :link {:rel :stylesheet :href "/rsc-out/main.css"}))
     ($ :body
       ($ root {:route route})
-      ($ :script {:src "/rsc-out/rsc.js"}))))
+      ($ :script {:src "/rsc-out/rsc.js"})))
+  #_($ root {:route route}))
