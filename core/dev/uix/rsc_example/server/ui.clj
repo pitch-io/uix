@@ -36,8 +36,8 @@
          ($ :div "by "
             ($ :span.font-medium by))
          " | "
-         #_($ uix/suspense {:fallback "loading span..."}
-             ($ span))
+         ($ uix/suspense {:fallback ($ :span "loading span...")}
+           ($ span))
           ;; todo: server comp type as prop
          ($ ui/vote-btn
             {:id id

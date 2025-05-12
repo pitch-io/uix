@@ -140,22 +140,23 @@
   (let [[tag attrs children] (dom.server/normalize-element el)]
     (into [(keyword tag) attrs] (map #(-unwrap % sb) children))))
 
-(defn serialize-blocking [this sb key tag]
+(defn serialize-blocking [this sb key tag & args]
   (when-not (contains? (key @sb) this)
     (let [id (get-id sb)
-          ch (async/go
+          ch (async/thread
                (try
                  @this
                  (catch Throwable e
                    e)))]
-      (swap! sb update key assoc this [ch id])))
+      (swap! sb update key assoc this (into [ch id] args))))
   (let [[_ id] (get (key @sb) this)]
     (str tag id)))
 
 (defn- unwrap-suspense-element [[tag {:keys [fallback children]}] sb]
-  (let [futures (map #(future (-unwrap % sb)) children)
-        tags (seq (map #(serialize-blocking % sb :suspended "$L") futures))]
-    [tag {:id (str (gensym))
+  (let [to-id (str (gensym "B:"))
+        futures (map #(future (-unwrap % sb)) children)
+        tags (seq (map #(serialize-blocking % sb :suspended "$L" to-id) futures))]
+    [tag {:to-id to-id
           :fallback (-unwrap fallback sb)
           :children tags}]))
 

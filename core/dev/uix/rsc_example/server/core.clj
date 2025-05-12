@@ -11,7 +11,9 @@
             [reitit.core :as r]
             [uix.rsc-example.server.root :as server.root]
             [uix.rsc-example.routes :refer [routes]])
-  (:import (java.io PushbackReader))
+  (:import (java.io PushbackReader PipedInputStream PipedOutputStream)
+           (java.nio ByteBuffer)
+           (java.util.zip GZIPOutputStream))
   (:gen-class))
 
 (defn read-end-stream [body]
@@ -21,22 +23,44 @@
 (def router
   (r/router routes))
 
+(defn chunk-gzip [pipe-in ch]
+  (future
+    (let [buf (byte-array 8192)]
+      (loop []
+        (let [n (.read pipe-in buf)]
+          (cond
+            (pos? n)
+            (do (server/send! ch (ByteBuffer/wrap buf 0 n) false)
+                (recur))
+
+            (= n -1)
+            (server/close ch)))))))
+
+(defn with-gzip [ch]
+  (let [pipe-out (PipedOutputStream.)
+        pipe-in (PipedInputStream. pipe-out)
+        gzip (GZIPOutputStream. pipe-out true)]
+    (server/send! ch {:status 200
+                      :headers {"Content-Type" "text/x-component; charset=utf-8"
+                                "Content-Encoding" "gzip"
+                                #_#_"Cache-Control" "max-age=10"}}
+                  false)
+    (chunk-gzip pipe-in ch)
+    (fn [chunk]
+      (if (= chunk :done)
+        (.close gzip)
+        (do (.write gzip (.getBytes chunk "UTF-8"))
+            (.flush gzip))))))
+
 (defn rsc-handler [request]
   (let [path (get (:query-params request) "path")
         route (r/match-by-path router path)]
     ;; request -> route -> react flight rows -> response stream
     (server/as-channel request
-      {:on-open (fn [ch]
-                  (let [on-chunk (fn [chunk]
-                                   (if (= chunk :done)
-                                     (server/close ch)
-                                     (server/send! ch {:status 200
-                                                       :body chunk
-                                                       :headers {"Content-Type" "text/x-component; charset=utf-8"
-                                                                 #_#_"Cache-Control" "max-age=10"}}
-                                                   false)))]
+      {:on-open (fn [ch]         ;; use compression on reverse proxy in prod
+                  (let [on-chunk (with-gzip ch)]
                     (rsc/render-to-flight-stream ($ server.root/page {:route route})
-                                                 {:on-chunk on-chunk})))})))
+                        {:on-chunk on-chunk})))})))
 
 (defn html-handler [request]
   (when-let [route (r/match-by-path router (:uri request))]

@@ -452,9 +452,9 @@
     (-render-html children *state sb)))
 
 ;; with streaming ssr with suspense
-(defn render-suspense! [[_ {:keys [id fallback]}] *state sb]
+(defn render-suspense! [[_ {:keys [to-id fallback]}] *state sb]
   (vreset! *state nil)
-  (append! sb (str "<!--$?--><template id='" id "'></template>"))
+  (append! sb (str "<!--$?--><template id='" to-id "'></template>"))
   (vreset! *state nil)
   (-render-html fallback *state sb)
   (vreset! *state nil)
