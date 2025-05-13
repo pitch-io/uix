@@ -345,6 +345,9 @@
 (def client? (exists? js/document)) ;; cljs can run in a browser or Node.js
 (def server? (not client?))
 
-(defn ^{:jsdoc ["@nosideeffects"]} set-display-name [f name]
-  (set! (.-displayName f) name)
+(defn- ^{:jsdoc ["@nosideeffects"]} set-name [f name]
   (js/Object.defineProperty f "name" #js {:value name}))
+
+(defn set-display-name [f name]
+  (set! (.-displayName f) name)
+  (set-name f name))

@@ -20,24 +20,23 @@
 (defui label []
   ($ :span "Vote"))
 
-(defui span []
+(defui external-link [props]
   (Thread/sleep 1000)
-  ($ :span "yo mamma"))
+  ($ :a.text-sm.text-emerald-50.mb-1.block.hover:underline
+     (into props {:target "_blank"})))
 
 (defui story [{:keys [data]}]
   (let [{:keys [id by score time title url kids]} data
         time (or time 0)]
     ($ :div.text-stone-800.px-4.py-2.bg-emerald-600.border-b.border-emerald-700.hover:bg-emerald-700
-       ($ :a.text-sm.text-emerald-50.mb-1.block.hover:underline
-          {:href url
-           :target "_blank"}
-          title)
+       ($ uix/suspense {:fallback ($ :span.text-sm.text-emerald-50.mb-1.block.hover:underline "[title]")}
+         ($ external-link
+            {:href url}
+            title))
        ($ :div.text-xs.flex.gap-2
          ($ :div "by "
             ($ :span.font-medium by))
          " | "
-         ($ uix/suspense {:fallback "loading span..."}
-           ($ span))
           ;; todo: server comp type as prop
          ($ ui/vote-btn
             {:id id

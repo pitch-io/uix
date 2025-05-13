@@ -107,8 +107,8 @@
       (rmp/wrap-params)))
 
 (defn start-server []
-  (server/run-server #'handler {:port 8080})
-  (println "Server is listening at http://localhost:8080"))
+  (println "Server is listening at http://localhost:8080")
+  (server/run-server #'handler {:port 8080}))
 
 (defn -main [& args]
   (start-server))

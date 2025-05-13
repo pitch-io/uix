@@ -143,18 +143,19 @@
 (defn serialize-blocking [this sb key tag & args]
   (when-not (contains? (key @sb) this)
     (let [id (get-id sb)
-          ch (async/thread
-               (try
-                 @this
-                 (catch Throwable e
-                   e)))]
+          ch this]
       (swap! sb update key assoc this (into [ch id] args))))
   (let [[_ id] (get (key @sb) this)]
     (str tag id)))
 
 (defn- unwrap-suspense-element [[tag {:keys [fallback children]}] sb]
   (let [to-id (str (gensym "B:"))
-        futures (map #(future (-unwrap % sb)) children)
+        futures (map #(async/thread
+                        (try
+                          (-unwrap % sb)
+                          (catch Throwable e
+                            e)))
+                     children)
         tags (seq (map #(serialize-blocking % sb :suspended "$L" to-id) futures))]
     [tag {:to-id to-id
           :fallback (-unwrap fallback sb)
