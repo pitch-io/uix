@@ -229,20 +229,33 @@
            (set-done))))))
 
 #?(:clj
+   (def ^:dynamic *cache*))
+
+#?(:clj
+   (defmacro cache [cache-key & body]
+     `(let [k# ~cache-key]
+        (if (contains? @*cache* k#)
+          (get @*cache* k#)
+          (let [ret# (do ~@body)]
+            (swap! *cache* assoc k# ret#)
+            ret#)))))
+
+#?(:clj
    (defn render-to-flight-stream
      "Renders UIx components into React Flight payload"
-     [src {:keys [on-chunk] :as opts}]
-     (let [done-count (atom 0)
-           set-done #(when (== 2 (swap! done-count inc))
-                       (on-chunk :done))
-           handle-chunk #(if (= :done %)
-                           (set-done)
-                           (on-chunk %))
-           sb (server.flight/create-state)
-           ast (server.flight/-unwrap src sb)]
-       ;; streamed flight payload -> suspended flight chunks
-       (server.flight/render-to-flight-stream ast {:on-chunk handle-chunk :sb sb})
-       (stream-suspended sb on-chunk set-done))))
+     [src {:keys [on-chunk cache] :as opts}]
+     (binding [*cache* (or cache (atom {}))]
+       (let [done-count (atom 0)
+             set-done #(when (== 2 (swap! done-count inc))
+                         (on-chunk :done))
+             handle-chunk #(if (= :done %)
+                             (set-done)
+                             (on-chunk %))
+             sb (server.flight/create-state)
+             ast (server.flight/-unwrap src sb)]
+         ;; streamed flight payload -> suspended flight chunks
+         (server.flight/render-to-flight-stream ast {:on-chunk handle-chunk :sb sb})
+         (stream-suspended sb on-chunk set-done)))))
 
 #?(:clj
    ;; todo: cleanup, streaming ssr should be a part of uix.dom.server
@@ -261,22 +274,23 @@
 #?(:clj
    (defn render-to-html-stream
      [src {:keys [on-html on-chunk] :as opts}]
-     (let [done-count (atom 0)
-           set-done #(when (== 2 (swap! done-count inc))
-                       (on-chunk :done))
-           handle-chunk #(if (= :done %)
-                           (set-done)
-                           (on-chunk (str "<script>window.__FLIGHT_DATA.push(" (json/generate-string %) ");</script>")))
-           sb (server.flight/create-state)
-           ast (server.flight/-unwrap src sb)
-           *state (volatile! :state/root)]
-       ;; initial html -> streaming html helpers -> streamed flight payload -> suspended flight + html chunks
-       (on-html (dom.server/render-to-string ast))
-       (on-chunk suspense-cleanup-js)
-       (on-chunk "<script>window.__FLIGHT_DATA ||= [];</script>")
-       (server.flight/render-to-flight-stream ast {:on-chunk handle-chunk :sb sb})
-       (stream-suspended sb handle-chunk set-done
-                         (fn [to-id element]
-                           (let [ssb (dom.server/make-static-builder)
-                                 from-id (str (gensym "S:"))]
-                             (on-chunk (render-html-chunk from-id to-id element *state ssb))))))))
+     (binding [*cache* (atom {})]
+       (let [done-count (atom 0)
+             set-done #(when (== 2 (swap! done-count inc))
+                         (on-chunk :done))
+             handle-chunk #(if (= :done %)
+                             (set-done)
+                             (on-chunk (str "<script>window.__FLIGHT_DATA.push(" (json/generate-string %) ");</script>")))
+             sb (server.flight/create-state)
+             ast (server.flight/-unwrap src sb)
+             *state (volatile! :state/root)]
+         ;; initial html -> streaming html helpers -> streamed flight payload -> suspended flight + html chunks
+         (on-html (str "<!DOCTYPE html>" (dom.server/render-to-string ast)))
+         (on-chunk suspense-cleanup-js)
+         (on-chunk "<script>window.__FLIGHT_DATA ||= [];</script>")
+         (server.flight/render-to-flight-stream ast {:on-chunk handle-chunk :sb sb :cache *cache*})
+         (stream-suspended sb handle-chunk set-done
+           (fn [to-id element]
+             (let [ssb (dom.server/make-static-builder)
+                   from-id (str (gensym "S:"))]
+               (on-chunk (render-html-chunk from-id to-id element *state ssb)))))))))

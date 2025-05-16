@@ -31,7 +31,7 @@
     ($ :div.text-stone-800.px-4.py-2.bg-emerald-600.border-b.border-emerald-700.hover:bg-emerald-700
        ($ uix/suspense {:fallback ($ :span.text-sm.text-emerald-50.mb-1.block.hover:underline "[title]")}
          ($ external-link
-            {:href url}
+            {:href (or url (str "/item/" (:id data)))}
             title))
        ($ :div.text-xs.flex.gap-2
          ($ :div "by "

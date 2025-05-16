@@ -110,8 +110,12 @@
   (println "Server is listening at http://localhost:8080")
   (server/run-server #'handler {:port 8080}))
 
-(defn -main [& args]
-  (start-server))
+(defn -main [& [training-run]]
+  (let [stop (start-server)]
+    (when training-run
+      (slurp "http://localhost:8080")
+      (slurp "http://localhost:8080/_rsc?path=/")
+      (stop))))
 
 (comment
   (def stop-server (start-server))

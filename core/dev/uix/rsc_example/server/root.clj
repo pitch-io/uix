@@ -21,10 +21,13 @@
          ($ component {:path path :params path-params})))))
 
 (defui page [{:keys [route]}]
-  ($ :html
+  ($ :html {:lang "en"}
     ($ :head
-      ($ :link {:rel :stylesheet :href "/rsc-out/main.css"}))
+      ($ :meta {:charset "utf-8"})
+      ($ :meta {:name "viewport" :content "width=device-width, initial-scale=1"})
+      ($ :meta {:name "description" :content "UIx RSC Demo page"})
+      ($ :title "UIx RSC Demo")
+      ($ :link {:rel :stylesheet :href "/rsc-out/main.css"})
+      ($ :script {:src "/rsc-out/rsc.js" :async true}))
     ($ :body
-      ($ root {:route route})
-      ($ :script {:src "/rsc-out/rsc.js"})))
-  #_($ root {:route route}))
+      ($ root {:route route}))))
