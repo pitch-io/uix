@@ -42,7 +42,7 @@
             {:id id
              :score score
              :label ($ label)
-             :on-click actions/vote})
+             :on-vote (rsc/partial actions/vote id score)})
          " | "
          ($ :div
             (to-locale-string (* 1e3 time)))

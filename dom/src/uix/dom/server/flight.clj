@@ -29,20 +29,31 @@
         (swap! sb update key assoc id value)
         id)))
 
+(defn- create-action-ref [sb refs action-id bound]
+  (let [ref-fn (cond-> {:id action-id}
+                       (seq bound) (assoc :bound bound))
+        id (get-cached-id sb :refs ref-fn)
+        ref-id (str "$F" id)
+        _ (swap! refs assoc ref-id ref-id)]
+    ref-id))
+
 (defn- with-client-refs [sb props]
   (let [refs (atom {})]
-    [(walk/postwalk
+    [(walk/prewalk
        (fn [form]
          (cond
            ;; server action as prop to client comp
            (and (fn? form)
                 (:uix.rsc/action-id (meta form)))
-           (let [action-id (:uix.rsc/action-id (meta form))
-                 ref-fn {:id action-id}
-                 id (get-cached-id sb :refs ref-fn)
-                 ref-id (str "$F" id)
-                 _ (swap! refs assoc ref-id ref-id)]
-             ref-id)
+           (let [action-id (:uix.rsc/action-id (meta form))]
+             (create-action-ref sb refs action-id []))
+
+           ;; partially applied server action
+           (and (vector? form)
+                (identical? :rsc/partial (nth form 0 nil)))
+           (let [[_ f args] form
+                 action-id (:uix.rsc/action-id (meta f))]
+             (create-action-ref sb refs action-id args))
 
            ;; server comp as prop to client comp
            (and (vector? form)

@@ -1,4 +1,5 @@
 (ns uix.rsc
+  #?(:clj (:refer-clojure :exclude [partial]))
   #?(:cljs (:require-macros [uix.rsc]))
   (:require #?@(:cljs [["@kentcdodds/tmp-react-server-dom-esm/client" :as rsd-client]
                        [clojure.edn :as edn]
@@ -227,6 +228,10 @@
              (when f (f to-id element))
              (recur (dissoc ch->to-id c)))
            (set-done))))))
+
+#?(:clj
+   (defn partial [f & args]
+     [:rsc/partial f args]))
 
 #?(:clj
    (def ^:dynamic *cache*))
