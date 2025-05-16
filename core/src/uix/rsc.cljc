@@ -265,10 +265,11 @@
 #?(:clj
    ;; todo: cleanup, streaming ssr should be a part of uix.dom.server
    (defn render-html-chunk [from-id to-id element *state sb]
-     (dom.server/append! sb "<div hidden id='" from-id "'>")
-     (dom.server/-render-html element *state sb)
-     (dom.server/append! sb (str "</div><script>$RC('" to-id "', '" from-id "');</script>"))
-     (str (.sb sb))))
+     (binding [dom.server/*sync-suspense* false]
+       (dom.server/append! sb "<div hidden id='" from-id "'>")
+       (dom.server/-render-html element *state sb)
+       (dom.server/append! sb (str "</div><script>$RC('" to-id "', '" from-id "');</script>"))
+       (str (.sb sb)))))
 
 #?(:clj
    (def suspense-cleanup-js
@@ -279,7 +280,8 @@
 #?(:clj
    (defn render-to-html-stream
      [src {:keys [on-html on-chunk] :as opts}]
-     (binding [*cache* (atom {})]
+     (binding [*cache* (atom {})
+               dom.server/*sync-suspense* false]
        (let [done-count (atom 0)
              set-done #(when (== 2 (swap! done-count inc))
                          (on-chunk :done))

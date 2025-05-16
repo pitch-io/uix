@@ -451,14 +451,20 @@
                    (cons attrs children))]
     (-render-html children *state sb)))
 
+(def ^:dynamic *sync-suspense* true)
+
 ;; with streaming ssr with suspense
-(defn render-suspense! [[_ {:keys [to-id fallback]}] *state sb]
-  (vreset! *state nil)
-  (append! sb (str "<!--$?--><template id='" to-id "'></template>"))
-  (vreset! *state nil)
-  (-render-html fallback *state sb)
-  (vreset! *state nil)
-  (append! sb "<!--/$-->"))
+(defn render-suspense! [[_ {:keys [to-id fallback children]}] *state sb]
+  (if *sync-suspense*
+    ;; executes all suspended components synchronously
+    (-render-html children *state sb)
+    (do
+      (vreset! *state nil)
+      (append! sb (str "<!--$?--><template id='" to-id "'></template>"))
+      (vreset! *state nil)
+      (-render-html fallback *state sb)
+      (vreset! *state nil)
+      (append! sb "<!--/$-->"))))
 
 (defn render-portal! [element]
   (binding [*out* *err*]
