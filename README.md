@@ -77,6 +77,8 @@ npm install react@19.0.0 react-dom@19.0.0 --save-dev
 - [Code-splitting and React.lazy](docs/code-splitting.md)
 - [Migrating from Reagent](docs/migrating-from-reagent.md)
 - [Server-side rendering](docs/server-side-rendering.md)
+  - [Streaming SSR](docs/server-side-rendering.md#streaming-ssr)
+- [React Server Components](docs/react-server-components.md)
 - [Hot reloading](docs/hot-reloading.md)
 - [React DevTools](docs/react-devtools.md)
 - [Code linting](docs/code-linting.md)

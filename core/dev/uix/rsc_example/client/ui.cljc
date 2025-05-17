@@ -1,12 +1,12 @@
 (ns uix.rsc-example.client.ui
-  (:require [uix.core :refer [defui $] :as uix]
-            [uix.rsc-example.actions :as actions]))
+  (:require [uix.core :refer [defui $] :as uix]))
 
 ;; todo: make client any var via ^:client meta
 ;; in cljs? maybe scan vars in shadow?
 (def say-hi
   ^{:rsc/id "uix.rsc-example.client.ui/say-hi"} (fn []
                                                   (prn :HEllo!)))
+
 #?(:cljs
     (uix.rsc/register-rsc-client! "uix.rsc-example.client.ui/say-hi" say-hi))
 
