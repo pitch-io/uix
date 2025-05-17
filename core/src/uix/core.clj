@@ -109,7 +109,8 @@
         [fname args fdecl props-cond] (parse-defui-sig `defui sym fdecl)]
     (uix.linter/lint! sym fdecl &form &env)
     (if (uix.lib/cljs-env? &env)
-      (let [memo? (-> sym meta :memo)
+      (let [rsc-client? (-> sym meta :client)
+            memo? (-> sym meta :memo)
             memo-sym (gensym fname)
             memo-fname (if memo?
                          (with-meta memo-sym (meta fname))
@@ -128,14 +129,20 @@
            (set-display-name ~memo-var-sym ~(str var-sym))
            ~(uix.dev/fast-refresh-signature memo-var-sym body)
            ~(when memo?
-              `(def ~fname (uix.core/memo ~memo-sym)))))
+              `(def ~fname (uix.core/memo ~memo-sym)))
+           ~(when rsc-client?
+              `(uix.rsc/register-rsc-client! ~(str var-sym) ~(if memo? fname memo-fname)))))
       (let [args-sym (gensym "args")
-            [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
-        `(defn ~fname [& ~args-sym]
-           ~(with-props-cond props-cond `(first ~args-sym))
-           (let [~args ~args-sym
-                 ~(or rest-sym `_#) (dissoc (first ~args-sym) ~@dissoc-ks)]
-             ~@fdecl))))))
+            [args dissoc-ks rest-sym] (uix.lib/rest-props args)
+            rsc-id (str *ns* "/" fname)]
+        `(def ~fname
+           (with-meta
+             (core/fn [& ~args-sym]
+               ~(with-props-cond props-cond `(first ~args-sym))
+               (let [~args ~args-sym
+                     ~(or rest-sym `_#) (dissoc (first ~args-sym) ~@dissoc-ks)]
+                 ~@fdecl))
+             ~(assoc (meta fname) :rsc/id rsc-id)))))))
 
 (defmacro fn
   "Creates anonymous UIx component. Similar to fn, but doesn't support multi arity.
@@ -352,8 +359,8 @@
      (uix.linter/lint-exhaustive-deps! &env &form f deps))
    `(uix.hooks.alpha/use-imperative-handle ~ref ~f ~(->js-deps deps))))
 
-(defui suspense [{:keys [children]}]
-  children)
+(defui suspense [{:keys [fallback children] :as props}]
+  [::suspense props])
 
 (defui strict-mode [{:keys [children]}]
   children)
