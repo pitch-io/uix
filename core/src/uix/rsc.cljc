@@ -211,6 +211,11 @@
        (apply handler args)
        (throw (IllegalArgumentException. (str "Unhandled action " action " " args))))))
 
+(defn use-client [{:keys [fallback]} & [child]]
+  (let [[mounted? set-mounted] (uix/use-state false)]
+    (uix/use-effect #(set-mounted true) [])
+    (if mounted? child fallback)))
+
 ;; Rendering =============
 
 #?(:clj

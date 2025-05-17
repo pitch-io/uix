@@ -41,6 +41,31 @@ Since client components can be rendered on server and they are written in `.cljc
   ($ input ...))
 ```
 
+To render client-only component, wrap it with `use-client` hook. The hook excludes the component from server rendering pass. Here's an example using react-select library.
+
+```clojure
+;; client, .cljc
+(ns client.ui
+  (:require [uix.core :as uix :refer [defui $]]
+            [uix.rsc :as rsc]
+            #?(:cljs [react-select :default Select])))
+
+(defui ^:client select [{:keys [options]}]
+  (rsc/use-client {:fallback "loading select"}
+    #?(:cljs ($ Select {:options (clj->js options)}))))
+
+;; server, .clj
+(ns server.ui
+  (:require [uix.core :as uix :refer [defui $]]
+            [client.ui :as ui]))
+
+(defui page []
+  ($ :html
+    ($ :body
+      ($ ui/select {:options [{:value 1 :label "one"}
+                              {:value 2 :label "two"}]}))))
+```
+
 ## Server Actions
 
 Server action is a Clojure function that runs on server and is exposed transparently to the client as backend API call.
