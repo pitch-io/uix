@@ -100,11 +100,41 @@
           (seq children)
           (assoc :children (map #(-render % sb) children))))
 
+(defn- simple-action? [attrs]
+  (-> attrs :action meta :uix.rsc/action-id))
+
+(defn- partial-action? [attrs]
+  (and (vector? (:action attrs))
+       (identical? :rsc/partial (nth (:action attrs) 0 nil))))
+
+(defn- action? [attrs]
+  (or (simple-action? attrs)
+      (partial-action? attrs)))
+
+(defn render-form-element [[tag attrs children :as el] sb]
+  (let [action (:rsc/action attrs)
+        [action-id args] (if (partial-action? attrs)
+                           [(-> (nth action 1) meta :uix.rsc/action-id)
+                            (nth action 2 nil)]
+                           [(-> action meta :uix.rsc/action-id)
+                            []])
+        ref-id (create-action-ref sb (atom {}) action-id [])
+        attrs (-> attrs
+                  (assoc :action ref-id)
+                  (dissoc :rsc/action))]
+    [tag attrs children]))
+
+(defn- form-with-action? [tag attrs]
+  (and (= :form tag) (action? attrs)))
+
 (defn render-dom-element
   "input: ($ :h1 'hello')
    output: [$ h1 key props]"
   [element sb]
-  (let [[tag attrs children] (dom.server/normalize-element element)]
+  (let [[tag attrs :as el] (update (dom.server/normalize-element element) 0 keyword)
+        [tag attrs children] (cond-> el
+                                     (form-with-action? tag attrs)
+                                     (render-form-element sb))]
     ["$" (name tag)
      (:key attrs)
      (render-props attrs children sb)]))
@@ -147,9 +177,23 @@
                    (cons attrs children))]
     (-unwrap children sb)))
 
+(defn- unwrap-form-element [[tag attrs children]]
+  (let [attrs (into attrs {:rsc/action (:action attrs)})
+        fields (if (simple-action? attrs)
+                 [[:input {:type :hidden :name "_$action" :value (-> attrs :action meta :uix.rsc/action-id)}]]
+                 (let [action (:action attrs)
+                       action-id (-> action (nth 1) meta :uix.rsc/action-id)
+                       args (nth action 2 [])]
+                   [[:input {:type :hidden :name "_$action" :value action-id}]
+                    [:input {:type :hidden :name "_$args" :value (str args)}]]))]
+    [tag attrs (into fields children)]))
+
 (defn- unwrap-dom-element [el sb]
-  (let [[tag attrs children] (dom.server/normalize-element el)]
-    (into [(keyword tag) attrs] (map #(-unwrap % sb) children))))
+  (let [[tag attrs :as el] (update (dom.server/normalize-element el) 0 keyword)
+        [tag attrs children] (cond-> el
+                                     (form-with-action? tag attrs)
+                                     (unwrap-form-element))]
+    (into [tag attrs] (map #(-unwrap % sb) children))))
 
 (defn serialize-blocking [this sb key tag & args]
   (when-not (contains? (key @sb) this)
@@ -256,17 +300,23 @@
          :imports {}
          :refs {}}))
 
-(defn render-to-flight-stream [src {:keys [on-chunk sb]}]
+(defn- render-result [src result sb]
+  (let [id (get-id sb)]
+    [(emit-row id (-render src sb))
+     (emit-row 0 {:result result :root (str "$" id)})]))
+
+(defn render-to-flight-stream [src {:keys [on-chunk sb result] :as opts}]
   (let [sb (or sb (create-state))
-        root-row (emit-row 0 (-render src sb))
+        root-rows (if (some? result)
+                    (render-result src result sb)
+                    [(emit-row 0 (-render src sb))])
         imports (mapv #(apply emit-row %) (:imports @sb))
         refs (mapv #(apply emit-row %) (:refs @sb))]
     ;; flight stream structure
     ;; 1. imports/client refs
     ;; 2. ui structure interleaved with async values
     (async/go
-      (on-chunk (str/join "" (into imports refs)))
-      (on-chunk root-row)
+      (on-chunk (str/join "" (into (into imports refs) root-rows)))
       (loop [ch->id (->> @sb :pending vals (into {}))]
         (if (seq ch->id)
           (let [[v c] (async/alts! (keys ch->id))

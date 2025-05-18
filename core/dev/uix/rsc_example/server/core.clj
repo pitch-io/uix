@@ -1,24 +1,19 @@
 (ns uix.rsc-example.server.core
-  (:require [clojure.edn :as edn]
-            [clojure.java.io :as io]
-            [uix.core :refer [defui $] :as uix]
+  (:require [uix.core :refer [defui $] :as uix]
             [uix.rsc :as rsc]
             [org.httpkit.server :as server]
             [compojure.core :refer [defroutes GET POST]]
             [compojure.route :as route]
             [ring.util.response :as resp]
             [ring.middleware.params :as rmp]
+            [ring.middleware.multipart-params :as rmmp]
             [reitit.core :as r]
             [uix.rsc-example.server.root :as server.root]
             [uix.rsc-example.routes :refer [routes]])
-  (:import (java.io PushbackReader PipedInputStream PipedOutputStream)
+  (:import (java.io PipedInputStream PipedOutputStream)
            (java.nio ByteBuffer)
            (java.util.zip GZIPOutputStream))
   (:gen-class))
-
-(defn read-end-stream [body]
-  (with-open [reader (io/reader body)]
-    (edn/read (PushbackReader. reader))))
 
 (def router
   (r/router routes))
@@ -38,7 +33,7 @@
 
 (defn with-gzip [ch]
   (let [pipe-out (PipedOutputStream.)
-        pipe-in (PipedInputStream. pipe-out)
+        pipe-in (PipedInputStream. pipe-out 16384)
         gzip (GZIPOutputStream. pipe-out true)]
     (server/send! ch {:status 200
                       :headers {"Content-Type" "text/x-component; charset=utf-8"
@@ -46,13 +41,13 @@
                                 #_#_"Cache-Control" "max-age=10"}}
                   false)
     (chunk-gzip pipe-in ch)
-    (fn [chunk]
+    (fn [^String chunk]
       (if (= chunk :done)
         (.close gzip)
         (do (.write gzip (.getBytes chunk "UTF-8"))
             (.flush gzip))))))
 
-(defn rsc-handler [request]
+(defn rsc-handler [request & {:keys [result]}]
   (let [path (get (:query-params request) "path")
         route (r/match-by-path router path)]
     ;; request -> route -> react flight rows -> response stream
@@ -60,7 +55,7 @@
       {:on-open (fn [ch]         ;; use compression on reverse proxy in prod
                   (let [on-chunk (with-gzip ch)]
                     (rsc/render-to-flight-stream ($ server.root/page {:route route})
-                        {:on-chunk on-chunk})))})))
+                      {:on-chunk on-chunk :result result})))})))
 
 (defn html-handler [request]
   (when-let [route (r/match-by-path router (:uri request))]
@@ -76,13 +71,13 @@
                                                {:on-chunk on-chunk
                                                 :on-html on-html})))})))
 
-(defn handle-server-action [body]
+(defn action-handler [request]
   (try
-    (-> (rsc/handle-action (read-end-stream body))
-        str
-        (resp/response)
-        (resp/header "Content-Type" "text/edn"))
+    (rsc/handle-action request)
+    ;; todo: route invalidation
+    (rsc-handler request :result :done)
     (catch Exception e
+      ;; todo: proper error response
       (-> (resp/bad-request (ex-message e))
           (resp/header "Content-Type" "text/edn")))))
 
@@ -91,8 +86,8 @@
   (GET "/_rsc" req
     (rsc-handler req))
   ;; server actions endpoint
-  (POST "/api" {body :body}
-    (handle-server-action body))
+  (POST "/_rsc" req
+    (action-handler req))
   ;; static assets
   (route/files "/" {:root "./"})
   ;; generating HTML for initial load of a route
@@ -104,6 +99,7 @@
 
 (def handler
   (-> #'server-routes
+      (rmmp/wrap-multipart-params)
       (rmp/wrap-params)))
 
 (defn start-server []

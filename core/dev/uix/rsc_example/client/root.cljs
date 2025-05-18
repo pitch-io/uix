@@ -8,5 +8,4 @@
     {:container js/document
      :routes routes
      :rsc-endpoint "/_rsc"
-     :server-actions-endpoint "/api"
      :ssr-enabled true}))

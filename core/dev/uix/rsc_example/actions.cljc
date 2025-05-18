@@ -1,6 +1,6 @@
 (ns uix.rsc-example.actions
-  (:require [uix.rsc :refer [defaction]]))
+  (:require [uix.rsc :refer [defaction]]
+            [uix.rsc-example.server.db :as db]))
 
-(defaction vote [id score]
-  ;; todo: quick db,sqlite example
-  (inc score))
+(defaction vote [{:keys [id]}]
+  (db/vote-on-story id))

@@ -9,10 +9,15 @@
                        [reitit.frontend.easy :as rfe]])
             #?@(:clj [[cheshire.core :as json]
                       [clojure.core.async :as async]
+                      [clojure.edn :as edn]
+                      [clojure.java.io :as io]
+                      [clojure.string :as str]
+                      [ring.util.response :as resp]
                       [uix.dom.server :as dom.server]
                       [uix.dom.server.flight :as server.flight]
                       [uix.lib :as lib]])
-            [uix.core :refer [defui $] :as uix]))
+            [uix.core :refer [defui $] :as uix])
+  #?(:clj (:import (java.io PushbackReader))))
 
 #?(:cljs
    (defn- create-rsc-client-container [uix-comp]
@@ -59,20 +64,24 @@
 #?(:cljs
    (do
      (defonce ^:private rsc-cache (atom {}))
-     (defonce ^:private server-actions-endpoint- (atom nil))
      (defonce ^:private rsc-endpoint- (atom nil))
-     (defonce ^:private router- (atom nil))))
+     (defonce ^:private router- (atom nil))
+     (defonce ^:private hacky-update-rsc-fn- (atom nil))))
 
 #?(:cljs
    (defn- exec-server-action [id args]
-     (if-let [endpoint @server-actions-endpoint-]
-       (-> (js/fetch endpoint
-                 #js {:method "POST"
-                      :body (str {:action id :args (vec args)})
-                      :headers #js {:content-type "text/edn"}})
-           (.then #(.text %))
-           (.then #(edn/read-string %)))
-       (js/Promise.reject "server-action-fn is not set"))))
+     (let [form? (instance? js/FormData (first args))
+           result (rsd-client/createFromFetch
+                    (js/fetch (str @rsc-endpoint- "?path=" js/location.pathname)
+                      #js {:method "POST"
+                           :body (if form? (first args) (str {:id id :args args}))
+                           :headers (if form? #js {} #js {:content-type "text/edn"})})
+                    #js {:moduleBaseURL "/"
+                         :callServer exec-server-action})]
+       (-> result
+           (.then (fn [^js response]
+                    (@hacky-update-rsc-fn- (.-root response))
+                    (.-result response)))))))
 
 #?(:cljs
    (defn- create-initial-flight-stream []
@@ -105,14 +114,15 @@
 #?(:cljs
    (defui router
      ;; link pressed -> url change -> request server render -> update DOM
-     [{:keys [ssr-enabled routes rsc-endpoint server-actions-endpoint]}]
+     [{:keys [ssr-enabled routes rsc-endpoint]}]
      (reset! rsc-endpoint- rsc-endpoint)
-     (reset! server-actions-endpoint- server-actions-endpoint)
      (let [initialized? (uix/use-ref false)
            router (uix/use-memo #(reset! router- (rf/router routes))
                                 [routes])
            [route set-route] (uix/use-state #(r/match-by-path router js/location.pathname))
            [resource set-resource] (uix/use-state #(init-rsc ssr-enabled))
+           _ (reset! hacky-update-rsc-fn- (fn [resource]
+                                            (uix/start-transition #(set-resource resource))))
            on-navigate (uix/use-effect-event
                          (fn [route]
                            (when @initialized?
@@ -204,12 +214,25 @@
           (into {}))))
 
 #?(:clj
+   (defn read-edn-stream [body]
+     (with-open [reader (io/reader body)]
+       (edn/read (PushbackReader. reader)))))
+
+#?(:clj
    (defn handle-action
      "client payload -> executes server action"
-     [{:keys [action args]}]
-     (if-let [handler (get (all-actions) action)]
-       (apply handler args)
-       (throw (IllegalArgumentException. (str "Unhandled action " action " " args))))))
+     [{:keys [multipart-params body headers]}]
+     (let [content-type (headers "content-type")
+           {:keys [action args]} (cond
+                                   (str/starts-with? content-type "multipart/form-data")
+                                   {:action (multipart-params "_$action")
+                                    :args (multipart-params "_$args")}
+                                   (= content-type "text/edn") (read-edn-stream body)
+                                   :else (throw (IllegalArgumentException. "Unhandled server action: unknown content-type " content-type)))
+           args (edn/read-string args)]
+       (if-let [handler (get (all-actions) action)]
+         (apply handler args)
+         (throw (IllegalArgumentException. (str "Unhandled action " action " " args)))))))
 
 (defn use-client [{:keys [fallback]} & [child]]
   (let [[mounted? set-mounted] (uix/use-state false)]
@@ -253,7 +276,7 @@
 #?(:clj
    (defn render-to-flight-stream
      "Renders UIx components into React Flight payload"
-     [src {:keys [on-chunk cache] :as opts}]
+     [src {:keys [on-chunk cache result]}]
      (binding [*cache* (or cache (atom {}))]
        (let [done-count (atom 0)
              set-done #(when (== 2 (swap! done-count inc))
@@ -264,7 +287,8 @@
              sb (server.flight/create-state)
              ast (server.flight/-unwrap src sb)]
          ;; streamed flight payload -> suspended flight chunks
-         (server.flight/render-to-flight-stream ast {:on-chunk handle-chunk :sb sb})
+         (server.flight/render-to-flight-stream ast
+           {:on-chunk handle-chunk :sb sb :result result})
          (stream-suspended sb on-chunk set-done)))))
 
 #?(:clj

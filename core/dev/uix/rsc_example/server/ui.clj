@@ -21,7 +21,6 @@
   ($ :span "Vote"))
 
 (defui external-link [props]
-  (Thread/sleep 1000)
   ($ :a.text-sm.text-emerald-50.mb-1.block.hover:underline
      (into props {:target "_blank"})))
 
@@ -37,12 +36,11 @@
          ($ :div "by "
             ($ :span.font-medium by))
          " | "
-          ;; todo: server comp type as prop
-         ($ ui/vote-btn
-            {:id id
-             :score score
-             :label ($ label)
-             :on-vote (rsc/partial actions/vote id score)})
+         ;; todo: file upload
+         ($ :form {:action (rsc/partial actions/vote {:id id})}
+           ($ ui/vote-btn
+              {:score score
+               :label ($ label)}))
          " | "
          ($ :div
             (to-locale-string (* 1e3 time)))

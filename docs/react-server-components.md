@@ -6,7 +6,7 @@ UIx implements [React Server Components (RSC)](https://react.dev/reference/rsc/s
 
 Server components are defined in `.clj` files and run on server. The purpose of a server component is to render HTML (or RSC payload). Server components can access database, fetch data and render client components.
 
-Since server components run on Clojure JVM, they do not have access to any of JavaScript APIs.
+Since server components run in Clojure JVM, they do not have access to any of JavaScript APIs.
 
 A typical server component looks like a normal UIx component.
 
@@ -26,7 +26,7 @@ A typical server component looks like a normal UIx component.
 
 ## Client Components
 
-Client components are defined in `.cljc` files and run on the client. At build time, client components code is compiled to JavaScript by [shadow-cljs](https://github.com/thheller/shadow-cljs). Since server components can render client components, client components are written in `.cljc` files.
+Client components are defined either in `.cljs` or `.cljc` files and run on the client. At build time, client components code is compiled to JavaScript by [shadow-cljs](https://github.com/thheller/shadow-cljs). Since server components can render client components, those client components should be written in `.cljc` files.
 
 A client-only component looks like a normal UIx component. Components that can be rendered by server components should be marked with `^:client` meta tag.
 
@@ -75,21 +75,21 @@ Server action is a Clojure function that runs on server and is exposed transpare
 (ns server.actions
   (:require [uix.rsc :refer [defaction]]))
 
-(defaction like-article [article-id]
+(defaction like-article [{:keys [id]}]
   (sql/exec {:update :articles,
              :set    {:likes [:+ :likes 1]},
-             :where  [:= :id article-id]}))
+             :where  [:= :id id]}))
 
 ;; client, .cljc
 (ns client.ui
   (:require [server.actions :as actions]))
 
 (defui like-button [{:keys [id]}]
-  ($ :button {:on-click #(actions/like-article id)}
+  ($ :button {:on-click #(actions/like-article {:id id})}
     "Like"))
 ```
 
-When the above client code is compiled to JavaScript, the `:on-click` handler becomes something like this `#(call-server "/api/like-article" id)`.
+When the above client code is compiled to JavaScript, the `:on-click` handler becomes something like this `#(call-server "/api" {:action "like-article" :id id})`.
 
 It's also possible to pass server actions as props to client components, so that client code won't refer server code at all.
 
@@ -98,10 +98,10 @@ It's also possible to pass server actions as props to client components, so that
 (ns server.actions
   (:require [uix.rsc :refer [defaction]]))
 
-(defaction like-article [article-id]
+(defaction like-article [{:keys [id]}]
   (sql/exec {:update :articles,
              :set    {:likes [:+ :likes 1]},
-             :where  [:= :id article-id]}))
+             :where  [:= :id id]}))
 
 ;; server, .clj
 (ns server.ui
@@ -122,21 +122,21 @@ It's also possible to pass server actions as props to client components, so that
   (:require [server.actions :as actions]))
 
 (defui like-button [{:keys [id on-like]}]
-  ($ :button {:on-click #(on-like id)}
+  ($ :button {:on-click #(on-like {:id id})}
     "Like"))
 ```
 
-Furthermore, it's possible to partially apply server actions on server. Keep in mind that server arguments bount to the action function are _still sent to the client_.
+Furthermore, it's possible to partially apply server actions on server. Keep in mind that server arguments bound to the action function are _still sent to the client_.
 
 ```clojure
 ;; server, .clj
 (ns server.actions
   (:require [uix.rsc :refer [defaction]]))
 
-(defaction like-article [article-id]
+(defaction like-article [{:keys [id]}]
   (sql/exec {:update :articles,
              :set    {:likes [:+ :likes 1]},
-             :where  [:= :id article-id]}))
+             :where  [:= :id id]}))
 
 ;; server, .clj
 (ns server.ui
@@ -150,7 +150,7 @@ Furthermore, it's possible to partially apply server actions on server. Keep in 
     content
     ($ :footer
       ($ client.ui/like-button
-        {:on-like (rsc/partial actions/like-article id)}))))
+        {:on-like (rsc/partial actions/like-article {:id id})}))))
 
 ;; client, .cljc
 (ns client.ui
@@ -160,6 +160,43 @@ Furthermore, it's possible to partially apply server actions on server. Keep in 
   ($ :button {:on-click #(on-like)}
     "Like"))
 ```
+
+### Form actions
+
+While the above example does execute a server action, it won't update contents of a page, if it is expected that updated state on the server should be instantly reflected on the client.
+
+Instead of manually calling a server action from event handler, use `:form` element to submit data to a server. The server will re-render server components and respond to form submission with updated RSC payload for current route. UIx will instantly display new content on a screen. This setup doesn't require client components at all.
+
+```clojure
+;; server, .clj
+(ns server.actions
+  (:require [uix.rsc :refer [defaction]]))
+
+(defaction like-article [{:keys [id]}]
+  (sql/exec {:update :articles,
+             :set    {:likes [:+ :likes 1]},
+             :where  [:= :id id]}))
+
+;; server, .clj
+(ns server.ui
+  (:require [server.actions :as actions]
+            [uix.rsc :as rsc]))
+
+(defui like-button [{:keys [likes]}]
+  ($ :button {:type :submit}
+    "Like " likes))
+
+(defui article [{:keys [title content id likes]}]
+  ($ :article
+    ($ :h1 title)
+    content
+    ($ :footer
+      ($ :form {:action (rsc/partial like-button {:id id})}
+        ($ like-button
+          {:likes likes})))))
+```
+
+Note that `:form` element takes partially applied action and the `like-button` button is of type `:submit` now. Normally, in pure HTML, pressing the button would cause a browser to submit data to a server and reload the page. But here React will intercept form submission and send `FormData` object asynchrounously. Server response is then picked up by UIx router and put on a screen.
 
 ## Caching
 
