@@ -1,7 +1,7 @@
 (ns uix.rsc
   #?(:clj (:refer-clojure :exclude [partial]))
   #?(:cljs (:require-macros [uix.rsc]))
-  (:require #?@(:cljs [["@kentcdodds/tmp-react-server-dom-esm/client" :as rsd-client]
+  (:require #?@(:cljs [["@roman01la/react-server-dom-esm/client" :as rsd-client]
                        [clojure.edn :as edn]
                        [clojure.walk :as walk]
                        [reitit.core :as r]

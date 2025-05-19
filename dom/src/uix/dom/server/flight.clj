@@ -21,7 +21,7 @@
   (when (> (count el) 1)
     (if (map? attrs)
       (cond-> attrs (seq children) (assoc :children children))
-      {:children (into [attrs] children)})))
+      {:children (seq (into [attrs] children))})))
 
 (defn- get-cached-id [sb key value]
   (or (->> @sb key (some (fn [[id v]] (when (= v value) id))))

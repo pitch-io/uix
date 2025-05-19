@@ -258,7 +258,10 @@
   (let [children (if (seq children) children (:children props))]
     [(dissoc props :children)
      (when children
-       (if (coll? children) children [children]))]))
+       (cond
+         (vector? children) [children]
+         (coll? children) children
+         :else [children]))]))
 
 (defn normalize-element [[first second & rest]]
   (let [[tag tag-id tag-classes] (uix.attrs/parse-tag first)

@@ -1,7 +1,10 @@
 (ns uix.rsc-example.server.ui
-  (:require [uix.core :refer [defui $] :as uix]
+  (:require [cheshire.core :as json]
+            [clojure.string :as str]
+            [uix.core :refer [defui $] :as uix]
             [uix.rsc :as rsc]
             [uix.rsc-example.actions :as actions]
+            [uix.rsc-example.server.db :as db]
             [uix.rsc-example.server.services :as services]
             [uix.rsc-example.client.ui :as ui])
   (:import (java.util Locale)
@@ -78,3 +81,94 @@
         {:keys [kids]} (services/fetch-item id)]
     (for [d kids]
       ($ item-comment {:key (:id d) :data d}))))
+
+(defui actor-link [{:keys [id]}]
+  (let [{:cast_members/keys [id name]} (first (db/ds-exec [db/q-actor id]))]
+    ($ rsc/link {:href (str "/actor/" id)
+                 :class "text-[#1458E1] hover:underline"}
+       name)))
+
+(defui fav-form [{:keys [id]}]
+  (let [liked? false]
+    ($ :form {:action (rsc/partial actions/update-fav {:id id :intent (if liked? "remove" "add")})}
+       ($ ui/fav-button {:liked? liked?}))))
+
+(defui movie-title [{:keys [id]}]
+  (let [{:movies/keys [id title year thumbnail extract]
+         :keys [cast_ids]}
+        (first (db/ds-exec [db/q-movies id]))
+        cast_ids (json/parse-string cast_ids)]
+    ($ :div {:class "w-[296px] flex flex-col gap-y-9"}
+       ($ rsc/link {:href (str "/movie/" id)}
+          ($ :img {:class "w-full h-[435px] object-cover mb-4"
+                   :src (if (str/blank? thumbnail)
+                          "https://picsum.photos/150/225"
+                          thumbnail)}))
+       ($ fav-form {:id id})
+       ($ :h2 {:class "font-instrumentSerif text-3xl"}
+          ($ rsc/link {:href (str "/movie/" id)
+                       :class "hover:underline"}
+             title)
+          " (" year ")")
+       ($ :p.mb-2
+          (if (> (count extract) 350)
+            (str (.substring extract 0 350)
+                 "...")
+            extract))
+       ($ :p
+          ($ :b.font-semibold
+             "Starring")
+          ": "
+          (->>
+            (for [id (take 10 cast_ids)]
+              ($ :span {:key id}
+                 ($ actor-link {:id id})))
+            (interpose ($ :span.mx-1 "•")))))))
+
+(defui movie-grid [{:keys [children]}]
+  ($ :div {:class "p-12 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-[auto_auto_auto] w-max mx-auto gap-x-12 gap-y-24"}
+     children))
+
+(defui home [route]
+  (let [ids [32932, 23643, 29915, 30895, 31472, 33411]]
+    ($ movie-grid
+       (for [id ids]
+         ($ movie-title {:key id :id id})))))
+
+(defui actor [{:keys [params]}]
+  (let [{:keys [id]} params
+        {:cast_members/keys [name] :keys [movie_ids]}
+        (first (db/ds-exec [db/q-actor id]))]
+    ($ :div {:class "flex flex-col gap-15"}
+      ($ :div {:class "flex flex-col gap-2"}
+        ($ :div {:class "font-bold text-center"}
+           "Starring")
+        ($ :h1 {:class "text-center font-instrumentSerif text-6xl"}
+           name)
+       ($ movie-grid
+          (for [id (str/split movie_ids #",")]
+            ($ movie-title {:key id :id id})))))))
+
+(defui movie [{:keys [params]}]
+  (let [{:keys [id]} params
+        {:movies/keys [thumbnail title extract]
+         :keys [cast_ids]}
+        (first (db/ds-exec [db/q-movies id]))
+        cast_ids (json/parse-string cast_ids)]
+    ($ :div {:class "p-12 items-center flex flex-col gap-y-12 lg:items-start lg:w-5xl lg:mx-auto lg:flex-row lg:gap-x-12"}
+      ($ :div {:class "w-[296px] flex-none flex flex-col gap-y-2"}
+         ($ :img {:class "h-[435px] object-cover mb-4"
+                  :src thumbnail})
+         ($ fav-form {:id id}))
+      ($ :div {:class "flex-1 flex flex-col gap-y-8"}
+         ($ :h1 {:class "font-instrumentSerif leading-[125%] text-6xl"}
+            title)
+         ($ :p extract)
+         ($ :div {:class "flex flex-col gap-y-2"}
+           ($ :div {:class "font-bold text-xl"} "Cast")
+           ($ :div
+              (->>
+                (for [id cast_ids]
+                  ($ :span {:key id}
+                     ($ actor-link {:id id})))
+                (interpose ($ :span.mx-1 "•")))))))))
