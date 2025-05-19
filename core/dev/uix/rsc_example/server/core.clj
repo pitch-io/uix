@@ -8,6 +8,7 @@
             [ring.middleware.params :as rmp]
             [ring.middleware.multipart-params :as rmmp]
             [reitit.core :as r]
+            [reitit.ring :as rer]
             [uix.rsc-example.server.root :as server.root]
             [uix.rsc-example.routes :refer [routes]])
   (:import (java.io PipedInputStream PipedOutputStream)
@@ -16,7 +17,7 @@
   (:gen-class))
 
 (def router
-  (r/router routes))
+  (rer/router routes))
 
 (defn chunk-gzip [pipe-in ch]
   (future
@@ -97,10 +98,14 @@
           (resp/header "Content-Type" "text/html")))
   (resp/not-found "404"))
 
-(def handler
-  (-> #'server-routes
+(defn wrap-rsc [handler {:keys [path] :or {path "/_rsc"}}]
+  (-> handler
       (rmmp/wrap-multipart-params)
       (rmp/wrap-params)))
+
+(def handler
+  (-> #'server-routes
+      (wrap-rsc {:path "/_rsc"})))
 
 (defn start-server []
   (println "Server is listening at http://localhost:8080")

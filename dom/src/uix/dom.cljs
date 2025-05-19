@@ -2,7 +2,8 @@
   "Public API"
   (:require-macros [uix.dom.linter])
   (:require ["react-dom/client" :as rdom-client]
-            [react-dom :as rdom]))
+            [react-dom :as rdom]
+            [cljs-bean.core :as bean]))
 
 ;; react-dom top-level API
 
@@ -88,7 +89,7 @@
 
   See: https://react.dev/reference/react-dom/hooks/useFormStatus"
   []
-  (rdom/useFormStatus))
+  (bean/bean (rdom/useFormStatus)))
 
 ;; resources preloading
 
