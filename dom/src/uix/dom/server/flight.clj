@@ -4,6 +4,7 @@
             [uix.compiler.attributes :as attrs]
             [uix.core :refer [$ defui]]
             [uix.dom.server :as dom.server]
+            [uix.rsc.loader :as loader]
             [cheshire.core :as json]
             [clojure.core.async :as async])
   (:import [clojure.lang IBlockingDeref IPersistentVector ISeq]))
@@ -166,9 +167,10 @@
 
 (defn- unwrap-component-element [[tag :as el] sb]
   (let [props (normalize-props el)
-        v (if (seq props)
-            (tag props)
-            (tag))]
+        v (loader/with-loader
+            (if (seq props)
+              (tag props)
+              (tag)))]
     (-unwrap v sb)))
 
 (defn- unwrap-fragment-element [[tag attrs & children] sb]
@@ -211,7 +213,7 @@
                           (catch Throwable e
                             e)))
                      children)
-        tags (seq (map #(serialize-blocking % sb :suspended "$L" to-id) futures))]
+        tags (map #(serialize-blocking % sb :suspended "$L" to-id) futures)]
     [tag {:to-id to-id
           :fallback (-unwrap fallback sb)
           :children tags}]))
@@ -229,18 +231,18 @@
   IPersistentVector
   (-unwrap [this sb]
     (if (vector? (first this))
-      (seq (map #(-unwrap % sb) this))
+      (map #(-unwrap % sb) this)
       (unwrap-element this sb)))
   (-render [this sb]
     (if (vector? (first this))
-      (seq (map #(-render % sb) this))
+      (map #(-render % sb) this)
       (render-element! this sb)))
 
   ISeq
   (-unwrap [this sb]
-    (seq (map #(-unwrap % sb) this)))
+    (doall (map #(-unwrap % sb) this)))
   (-render [this sb]
-    (seq (map #(-render % sb) this)))
+    (doall (map #(-render % sb) this)))
 
   String
   (-unwrap [this sb]

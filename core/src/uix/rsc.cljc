@@ -12,10 +12,10 @@
                       [clojure.edn :as edn]
                       [clojure.java.io :as io]
                       [clojure.string :as str]
-                      [ring.util.response :as resp]
                       [uix.dom.server :as dom.server]
                       [uix.dom.server.flight :as server.flight]
-                      [uix.lib :as lib]])
+                      [uix.lib :as lib]
+                      [uix.rsc.loader :as loader]])
             [uix.core :refer [defui $] :as uix])
   #?(:clj (:import (java.io PushbackReader))))
 
@@ -285,7 +285,8 @@
                              (set-done)
                              (on-chunk %))
              sb (server.flight/create-state)
-             ast (server.flight/-unwrap src sb)]
+             ast (loader/run-with-loader
+                   #(server.flight/-unwrap src sb))]
          ;; streamed flight payload -> suspended flight chunks
          (server.flight/render-to-flight-stream ast
            {:on-chunk handle-chunk :sb sb :result result})
@@ -318,7 +319,8 @@
                              (set-done)
                              (on-chunk (str "<script>window.__FLIGHT_DATA.push(" (json/generate-string %) ");</script>")))
              sb (server.flight/create-state)
-             ast (server.flight/-unwrap src sb)
+             ast (loader/run-with-loader
+                   #(server.flight/-unwrap src sb))
              *state (volatile! :state/root)]
          ;; initial html -> streaming html helpers -> streamed flight payload -> suspended flight + html chunks
          (on-html (str "<!DOCTYPE html>" (dom.server/render-to-string ast)))

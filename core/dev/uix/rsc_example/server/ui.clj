@@ -83,7 +83,7 @@
       ($ item-comment {:key (:id d) :data d}))))
 
 (defui actor-link [{:keys [id]}]
-  (let [{:cast_members/keys [id name]} (first (db/ds-exec [db/q-actor id]))]
+  (let [{:cast_members/keys [id name]} (db/fetch-actor id)]
     ($ rsc/link {:href (str "/actor/" id)
                  :class "text-[#1458E1] hover:underline"}
        name)))
@@ -96,8 +96,7 @@
 (defui movie-title [{:keys [id]}]
   (let [{:movies/keys [id title year thumbnail extract]
          :keys [cast_ids]}
-        (first (db/ds-exec [db/q-movies id]))
-        cast_ids (json/parse-string cast_ids)]
+        (db/fetch-movie id)]
     ($ :div {:class "w-[296px] flex flex-col gap-y-9"}
        ($ rsc/link {:href (str "/movie/" id)}
           ($ :img {:class "w-full h-[435px] object-cover mb-4"
@@ -138,23 +137,22 @@
 (defui actor [{:keys [params]}]
   (let [{:keys [id]} params
         {:cast_members/keys [name] :keys [movie_ids]}
-        (first (db/ds-exec [db/q-actor id]))]
+        (db/fetch-actor id)]
     ($ :div {:class "flex flex-col gap-15"}
       ($ :div {:class "flex flex-col gap-2"}
         ($ :div {:class "font-bold text-center"}
            "Starring")
         ($ :h1 {:class "text-center font-instrumentSerif text-6xl"}
-           name)
-       ($ movie-grid
-          (for [id (str/split movie_ids #",")]
-            ($ movie-title {:key id :id id})))))))
+           name))
+      ($ movie-grid
+         (for [id movie_ids]
+           ($ movie-title {:key id :id id}))))))
 
 (defui movie [{:keys [params]}]
   (let [{:keys [id]} params
         {:movies/keys [thumbnail title extract]
          :keys [cast_ids]}
-        (first (db/ds-exec [db/q-movies id]))
-        cast_ids (json/parse-string cast_ids)]
+        (db/fetch-movie id)]
     ($ :div {:class "p-12 items-center flex flex-col gap-y-12 lg:items-start lg:w-5xl lg:mx-auto lg:flex-row lg:gap-x-12"}
       ($ :div {:class "w-[296px] flex-none flex flex-col gap-y-2"}
          ($ :img {:class "h-[435px] object-cover mb-4"
