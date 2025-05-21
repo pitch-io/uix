@@ -4,6 +4,9 @@
             [next.jdbc :as jdbc]
             [uix.rsc.loader :as loader]))
 
+(def ^:dynamic *sid*)
+(def sessions (atom #{}))
+
 ;; sqlite
 (def ds
   (jdbc/get-datasource
@@ -13,7 +16,7 @@
   (jdbc/execute! ds stmt))
 
 (defn fetch-movies [ids]
-  (println :fetch-movies ids)
+  #_(println :fetch-movies ids)
   (let [query (str "SELECT
                       m.*,
                       JSON_GROUP_ARRAY(DISTINCT mg.genre_id) as genre_ids,
@@ -34,8 +37,8 @@
       (let [ids (mapv first args)]
         (fetch-movies ids)))))
 
-(defn fetch-actors [ids]
-  (println :fetch-actors ids)
+(defn- fetch-actors [ids]
+  #_(println :fetch-actors ids)
   (let [query (str "SELECT
                       actor.*,
                       GROUP_CONCAT(

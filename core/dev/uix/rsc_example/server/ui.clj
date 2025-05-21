@@ -89,8 +89,8 @@
        name)))
 
 (defui fav-form [{:keys [id]}]
-  (let [liked? false]
-    ($ :form {:action (rsc/partial actions/update-fav {:id id :intent (if liked? "remove" "add")})}
+  (let [liked? (db/fav? db/*sid* id)]
+    ($ :form {:action (rsc/partial actions/update-fav {:id id :intent (if liked? :remove :add)})}
        ($ ui/fav-button {:liked? liked?}))))
 
 (defui movie-title [{:keys [id]}]

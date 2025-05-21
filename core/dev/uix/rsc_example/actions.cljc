@@ -7,4 +7,7 @@
   (db/vote-on-story id))
 
 (defaction update-fav [{:keys [id intent]}]
-  (Thread/sleep 1000))
+  (case intent
+    :add (db/favs+ db/*sid* id)
+    :remove (db/favs- db/*sid* id))
+  true)

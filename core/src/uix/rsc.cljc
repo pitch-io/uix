@@ -309,7 +309,7 @@
 
 #?(:clj
    (defn render-to-html-stream
-     [src {:keys [on-html on-chunk] :as opts}]
+     [src {:keys [on-chunk] :as opts}]
      (binding [*cache* (atom {})
                dom.server/*sync-suspense* false]
        (let [done-count (atom 0)
@@ -323,7 +323,7 @@
                    #(server.flight/-unwrap src sb))
              *state (volatile! :state/root)]
          ;; initial html -> streaming html helpers -> streamed flight payload -> suspended flight + html chunks
-         (on-html (str "<!DOCTYPE html>" (dom.server/render-to-string ast)))
+         (on-chunk (str "<!DOCTYPE html>" (dom.server/render-to-string ast)))
          (on-chunk suspense-cleanup-js)
          (on-chunk "<script>window.__FLIGHT_DATA ||= [];</script>")
          (server.flight/render-to-flight-stream ast {:on-chunk handle-chunk :sb sb :cache *cache*})

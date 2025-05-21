@@ -1,7 +1,8 @@
 (ns uix.rsc-example.server.root
   (:require [uix.core :refer [defui $] :as uix]
             [uix.rsc :as rsc]
-            [uix.rsc-example.routes :refer [routes]]))
+            [uix.rsc-example.routes :refer [routes]]
+            [uix.rsc-example.server.db :as db]))
 
 (defui root [{:keys [route]}]
   (let [{:keys [path path-params data]} route
@@ -27,21 +28,22 @@
         "RSC Movies")))
 
 (defui fav-link [{:keys [id]}]
-  (let [{:keys [thumbnail]} {}]
+  ;; todo: fix batching
+  (let [{:movies/keys [thumbnail] :as m} (first (db/fetch-movies [id]))]
     ($ rsc/link {:href (str "/movie/" id)}
-       ($ :img {:class "w-[112px] h-[162px] object-cover"
-                :src thumbnail}))))
+      ($ :img {:class "w-[112px] h-[162px] object-cover"
+               :src thumbnail}))))
 
 (defui favourites []
-  (let [favorites []]
+  (let [favorites (db/favs db/*sid*)]
     (when (seq favorites)
       ($ :div {:class "fixed bottom-0 left-0 right-0 bg-black/66 backdrop-blur-sm border-t-black/10 p-4"}
          ($ :div {:class "overflow-x-auto snap-x snap-mandatory"}
            ($ :div {:class "flex flex-nowrap gap-x-2"}
-              (for [id favorites]
+              (for [{:favorites/keys [movie_id]} favorites]
                 ($ :div {:class "flex-shrink-0 snap-start"
-                         :key id}
-                   ($ fav-link {:id id})))))))))
+                         :key movie_id}
+                   ($ fav-link {:id movie_id})))))))))
 
 (defui page [{:keys [route]}]
   (let [{:keys [path path-params data]} route
