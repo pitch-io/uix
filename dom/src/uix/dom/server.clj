@@ -258,7 +258,10 @@
   (let [children (if (seq children) children (:children props))]
     [(dissoc props :children)
      (when children
-       (if (coll? children) children [children]))]))
+       (cond
+         (vector? children) [children]
+         (coll? children) children
+         :else [children]))]))
 
 (defn normalize-element [[first second & rest]]
   (let [[tag tag-id tag-classes] (uix.attrs/parse-tag first)
@@ -363,8 +366,8 @@
 (defn render-attr! [tag key value sb]
   (let [attr (normalize-attr-key key)]
     (case attr
-      "id" (when value (append! sb " id=\"" value "\""))
-      "type" (when value (append! sb " type=\"" value "\""))
+      "id" (when value (append! sb " id=\"" (to-str value) "\""))
+      "type" (when value (append! sb " type=\"" (to-str value) "\""))
       "style" (render-style! value sb)
       ("key" "ref" "dangerouslySetInnerHTML") :nop
       ("class" "className" "class-name") (render-classes! value sb)
@@ -429,6 +432,13 @@
   (when-not (keyword? tag)
     (throw (ex-info "Tag should be keyword" {:tag tag})))
   (let [[tag attrs children] (normalize-element element)
+        attrs (if (and (= "form" tag) (contains? attrs :rsc/action))
+                (-> attrs
+                    (dissoc :rsc/action)
+                    (assoc :action ""
+                           :enc-type "multipart/form-data"
+                           :method "POST"))
+                attrs)
         select-value (get-value attrs)]
     (append! sb "<" tag)
 
@@ -451,9 +461,20 @@
                    (cons attrs children))]
     (-render-html children *state sb)))
 
-(defn render-suspense! [element]
-  (binding [*out* *err*]
-    (prn (str "React.Suspense elements are not supported on JVM, skipping: " element))))
+(def ^:dynamic *sync-suspense* true)
+
+;; with streaming ssr with suspense
+(defn render-suspense! [[_ {:keys [to-id fallback children]}] *state sb]
+  (if *sync-suspense*
+    ;; executes all suspended components synchronously
+    (-render-html children *state sb)
+    (do
+      (vreset! *state nil)
+      (append! sb (str "<!--$?--><template id='" to-id "'></template>"))
+      (vreset! *state nil)
+      (-render-html fallback *state sb)
+      (vreset! *state nil)
+      (append! sb "<!--/$-->"))))
 
 (defn render-portal! [element]
   (binding [*out* *err*]
@@ -504,6 +525,7 @@
               children (seq (nth element 2 nil))]
           (binder #(-render-html children *state sb)))
         (identical? :<> tag) (render-fragment! element *state sb)
+        (identical? :uix.core/suspense tag) (render-suspense! element *state sb)
         (keyword? tag) (render-html-element! element *state sb)
         :else (render-component! element *state sb)))))
 
@@ -533,6 +555,9 @@
   Object
   (-render-html [this *state sb]
     (-render-html (str this) *state sb))
+
+  clojure.lang.Atom
+  (-render-html [this *state sb])
 
   nil
   (-render-html [this *state sb]

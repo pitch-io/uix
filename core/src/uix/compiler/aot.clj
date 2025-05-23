@@ -122,7 +122,7 @@
 (defn compile-element [v {:keys [env] :as opts}]
   (if (uix.lib/cljs-env? env)
     (compile-element* v opts)
-    (with-spread-props v)))
+    (with-meta (with-spread-props v) {:uix/element? true})))
 
 ;; ========== forms rewriter ==========
 

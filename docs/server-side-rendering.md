@@ -77,3 +77,30 @@ This repo is setup for everything you'll need, and since it's a template repo yo
 ## Hooks
 
 Only a subset of Hooks runs when server rendering. Read [React docs](https://react.dev/) to understand how hooks work when server rendering.
+
+## Streaming SSR
+
+When fetching data in components during server rendering you'll inevitably delay client request. Depending on how much time blocking code takes to fetch data, the client will see a blank page because it doesn't receive any HTML for initial request.
+
+To solve this problem, you can rendered components that include blocking code on a separate thread, by wrapping them with `suspense` component.
+
+```clojure
+(defui article [{:keys [id]}]
+  (let [data (fetch-data id)]
+    ...))
+
+(defui placeholder []
+  ($ :span "Loading..."))
+
+(defui page [{:keys [id]}]
+  ($ :html
+    ($ :head)
+    ($ :body
+      ($ page-header)
+      ($ sidebar)
+      ($ uix/suspense {:fallback ($ placeholder)}
+        ($ article))
+      ($ page-footer))))
+```
+
+This way server will send initial HTML, with specified `:fallback` placeholders, over persistent HTTP connection, and later, when suspended components unblock, chunks of rendered HTML will be streamed to the client.
