@@ -97,7 +97,7 @@
                (some #(or (and (contains? '#{cljs.core clojure.core} (:ns %))
                                (contains? '#{fn fn* defn defn- defmethod} (:name %)))
                           (and (contains? '#{uix.core} (:ns %))
-                               (contains? '#{defui fn} (:name %)))))
+                               (contains? '#{defui defhook fn} (:name %)))))
                not)
       (api/reg-finding! (-> (meta node)
                             (merge {:message "React Hook cannot be called at the top level. React Hooks must be called in a React function component or a custom React Hook function."
