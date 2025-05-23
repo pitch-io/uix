@@ -64,7 +64,6 @@
 #?(:cljs
    (do
      (defonce ^:private rsc-cache (atom {}))
-     (defonce ^:private rsc-endpoint- (atom nil))
      (defonce ^:private router- (atom nil))
      (defonce ^:private hacky-update-rsc-fn- (atom nil))))
 
@@ -72,7 +71,7 @@
    (defn- exec-server-action [id args]
      (let [form? (instance? js/FormData (first args))
            result (rsd-client/createFromFetch
-                    (js/fetch (str @rsc-endpoint- "?path=" js/location.pathname)
+                    (js/fetch (str js/location.pathname "?_rsc")
                       #js {:method "POST"
                            :body (if form? (first args) (str {:id id :args args}))
                            :headers (if form? #js {} #js {:content-type "text/edn"})})
@@ -101,7 +100,7 @@
 #?(:cljs
    (defn- create-from-fetch [route & {:keys [priority]}]
      (rsd-client/createFromFetch
-       (js/fetch (str @rsc-endpoint- "?path=" (:path route)) #js {:priority (or priority "auto")})
+       (js/fetch (str (:path route) "?_rsc") #js {:priority (or priority "auto")})
        #js {:moduleBaseURL "/"
             :callServer exec-server-action})))
 
@@ -114,8 +113,7 @@
 #?(:cljs
    (defui router
      ;; link pressed -> url change -> request server render -> update DOM
-     [{:keys [ssr-enabled routes rsc-endpoint]}]
-     (reset! rsc-endpoint- rsc-endpoint)
+     [{:keys [ssr-enabled routes]}]
      (let [initialized? (uix/use-ref false)
            router (uix/use-memo #(reset! router- (rf/router routes))
                                 [routes])
@@ -143,6 +141,7 @@
 
 #?(:cljs
    (defn- prefetch [href]
+     ;; todo: invalidate prefetched routes
      (when (r/match-by-path @router- href)
        (when-not (@rsc-cache href)
          (swap! rsc-cache assoc href (create-from-fetch {:path href} :priority "low"))))))

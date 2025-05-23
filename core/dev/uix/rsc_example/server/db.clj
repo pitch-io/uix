@@ -10,7 +10,7 @@
 ;; sqlite
 (def ds
   (jdbc/get-datasource
-    {:jdbcUrl "jdbc:sqlite:/Users/romanliutikov/projects/uix/core/database.sqlite"}))
+    {:jdbcUrl "jdbc:sqlite:resources/database.sqlite"}))
 
 (defn ds-exec [stmt]
   (jdbc/execute! ds stmt))

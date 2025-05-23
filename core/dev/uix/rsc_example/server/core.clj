@@ -62,8 +62,7 @@
             (.flush gzip))))))
 
 (defn rsc-handler [request & {:keys [result]}]
-  (let [path (get (:query-params request) "path")
-        route (r/match-by-path router path)]
+  (let [route (r/match-by-path router (:uri request))]
     ;; request -> route -> react flight rows -> response stream
     (server/as-channel request
       {:on-open (fn [ch]         ;; use compression on reverse proxy in prod
@@ -79,7 +78,7 @@
                     (rsc/render-to-html-stream ($ server.root/page {:route route})
                       {:on-chunk on-chunk})))})))
 
-(defn action-handler [request]
+(defn rsc-action-handler [request]
   (try
     (rsc/handle-action request)
     ;; todo: route invalidation
@@ -87,28 +86,38 @@
     (catch Exception e
       ;; todo: proper error response
       (-> (resp/bad-request (ex-message e))
-          (resp/header "Content-Type" "text/edn")))))
+          (resp/header "Content-Type" "text/x-component; charset=utf-8")))))
+
+(defn html-action-handler [request]
+  (try
+    (rsc/handle-action request)
+    (html-handler request)
+    (catch Exception e
+      ;; todo: proper error response
+      (-> (resp/bad-request (ex-message e))
+          (resp/header "Content-Type" "text/html")))))
+
+(defn handle-action [req]
+  (if (contains? (:params req) "_rsc")
+    (rsc-action-handler req)
+    (html-action-handler req)))
+
+(defn handle-route [req]
+  (if (contains? (:params req) "_rsc")
+    (rsc-handler req)
+    (html-handler req)))
 
 (defroutes server-routes
-  ;; react flight payload endpoint
-  (GET "/_rsc" req
-    (binding [db/*sid* (get-session req)]
-      (rsc-handler req)))
-  ;; server actions endpoint
-  (POST "/_rsc" req
-    (binding [db/*sid* (get-session req)]
-      (action-handler req)))
-  ;; static assets
   (route/files "/" {:root "./"})
-  ;; generating HTML for initial load of a route
   (GET "/*" req
     (binding [db/*sid* (get-session req)]
-      (html-handler req)
-      #_(-> (resp/response "<link rel=\"prefetch\" href=\"/rsc?path=/\" /><link rel=\"stylesheet\" href=\"/rsc-out/main.css\"><div id=root></div><script src=\"/rsc-out/rsc.js\"></script>\n")
-            (resp/header "Content-Type" "text/html"))))
+      (handle-route req)))
+  (POST "/*" req
+    (binding [db/*sid* (get-session req)]
+      (handle-action req)))
   (resp/not-found "404"))
 
-(defn wrap-rsc [handler {:keys [path] :or {path "/_rsc"}}]
+(defn wrap-rsc [handler]
   (-> handler
       (rmc/wrap-cookies)
       (rmmp/wrap-multipart-params)
@@ -116,7 +125,7 @@
 
 (def handler
   (-> #'server-routes
-      (wrap-rsc {:path "/_rsc"})))
+      (wrap-rsc)))
 
 (defn start-server []
   (println "Server is listening at http://localhost:8080")
@@ -126,7 +135,7 @@
   (let [stop (start-server)]
     (when training-run
       (slurp "http://localhost:8080")
-      (slurp "http://localhost:8080/_rsc?path=/")
+      (slurp "http://localhost:8080/?_rsc")
       (stop))))
 
 (comment
