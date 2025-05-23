@@ -185,7 +185,7 @@
                  [[:input {:type :hidden :name "_$action" :value (-> attrs :action meta :uix.rsc/action-id)}]]
                  (let [action (:action attrs)
                        action-id (-> action (nth 1) meta :uix.rsc/action-id)
-                       args (nth action 2 [])]
+                       args (first (nth action 2 []))]
                    [[:input {:type :hidden :name "_$action" :value action-id}]
                     [:input {:type :hidden :name "_$args" :value (str args)}]]))]
     [tag attrs (into fields children)]))

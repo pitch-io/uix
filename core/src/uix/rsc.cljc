@@ -69,6 +69,7 @@
 
 #?(:cljs
    (defn- exec-server-action [id args]
+     ;; todo: calling server actions from client side, should create FormData
      (let [form? (instance? js/FormData (first args))
            result (rsd-client/createFromFetch
                     (js/fetch (str js/location.pathname "?_rsc")
@@ -232,15 +233,17 @@
      "client payload -> executes server action"
      [{:keys [multipart-params body headers]}]
      (let [content-type (headers "content-type")
+           args (edn/read-string (multipart-params "_$args"))
            {:keys [action args]} (cond
                                    (str/starts-with? content-type "multipart/form-data")
                                    {:action (multipart-params "_$action")
-                                    :args (multipart-params "_$args")}
+                                    :args (->> (dissoc multipart-params "_$action" "_$args")
+                                               (reduce-kv #(assoc %1 (keyword %2) %3) {})
+                                               (merge args))}
                                    (= content-type "text/edn") (read-edn-stream body)
-                                   :else (throw (IllegalArgumentException. "Unhandled server action: unknown content-type " content-type)))
-           args (edn/read-string args)]
+                                   :else (throw (IllegalArgumentException. "Unhandled server action: unknown content-type " content-type)))]
        (if-let [handler (get (all-actions) action)]
-         (apply handler args)
+         (handler args)
          (throw (IllegalArgumentException. (str "Unhandled action " action " " args)))))))
 
 (defn use-client [{:keys [fallback]} & [child]]
