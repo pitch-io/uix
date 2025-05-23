@@ -111,6 +111,35 @@
        (create-from-fetch {:path js/location.pathname}))))
 
 #?(:cljs
+   (def prefetcher-ctx (uix/create-context {})))
+
+#?(:cljs
+   (defn- prefetch [href]
+     ;; todo: invalidate prefetched routes
+     (when (r/match-by-path @router- href)
+       (when-not (@rsc-cache href)
+         (swap! rsc-cache assoc href (create-from-fetch {:path href} :priority "low"))))))
+
+#?(:cljs
+   (defui prefetcher [{:keys [level children]}]
+     (let [obs (uix/use-memo
+                 #(js/IntersectionObserver.
+                    (fn [entries]
+                      (when (= :high level)
+                        (doseq [entry entries]
+                          (when (.-isIntersecting entry)
+                            (let [url (js/URL. (.. entry -target -href))]
+                              (prefetch (.-pathname url))))))))
+                 [level])
+           observe (uix/use-callback
+                     (fn [node]
+                       (.observe obs node)
+                       #(.unobserve obs node))
+                     [obs])]
+       ($ prefetcher-ctx {:value {:observe observe}}
+          children))))
+
+#?(:cljs
    (defui router
      ;; link pressed -> url change -> request server render -> update DOM
      [{:keys [ssr-enabled routes]}]
@@ -137,39 +166,20 @@
                #(rfe/start! router on-navigate {:use-fragment false})
                [router])]
        ($ router-context {:value {:route route}}
-         resource))))
-
-#?(:cljs
-   (defn- prefetch [href]
-     ;; todo: invalidate prefetched routes
-     (when (r/match-by-path @router- href)
-       (when-not (@rsc-cache href)
-         (swap! rsc-cache assoc href (create-from-fetch {:path href} :priority "low"))))))
+         ($ prefetcher {:level :low}
+           resource)))))
 
 (defui ^:client link [props]
   #?(:clj ($ :a props)
      :cljs
-     ;; wip
+     ;; todo: wip
       (let [wrap-handler (fn [handler f]
                            (fn [e]
                              (when handler (handler e))
                              (f e)))
-            href (:href props)
-            ref (uix/use-ref)]
-
-        (uix/use-effect
-          (fn []
-            (let [node @ref
-                  observer (js/IntersectionObserver.
-                             (fn [entries]
-                               (doseq [entry entries]
-                                 (when (.-isIntersecting entry)
-                                   (prefetch href)))))]
-              (.observe observer node)
-              #(.unobserve observer node)))
-          [href])
+            {:keys [observe]} (uix/use prefetcher-ctx)]
         ($ :a (-> props
-                  (assoc :ref ref)
+                  (assoc :ref observe)
                   (update :on-mouse-enter wrap-handler #(prefetch (:href props))))))))
 
 #?(:clj
