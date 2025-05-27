@@ -28,10 +28,12 @@
          (binding [*current-component* ~var-sym] (f#))
          (f#)))))
 
+(def props-assert-fn (atom (core/fn [& args] true)))
+
 (defn- with-props-cond [props-cond props-sym]
   (when props-cond
     `{:pre ~(mapv (core/fn [spec]
-                    `(preo.core/arg! ~spec ~props-sym))
+                    `(@props-assert-fn ~spec ~props-sym))
                   props-cond)}))
 
 (defn- register-spec! [props-cond ns sym]

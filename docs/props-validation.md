@@ -123,3 +123,7 @@ Of course compile time props checking is limited by dynamic nature of the langua
 - There's no validation for values in props map, only for existence of specified keys (this might change in the future, since it's possible to have partial checking for contents of props map)
 - Only required keys (`:req` and `:req-un`) are checked
 - The check kicks-in only for props written as map literal
+
+To overcome these limitations you can also enable runtime props validation that will run alongside compile-time checking. To enable runtime checking in development, include `uix.preload` namespace in `:preloads` build option.
+
+If you want to keep assertions in production build, include `(uix.validate/set-props-assertion-enabled! true)` in an entry point namespace in your project.

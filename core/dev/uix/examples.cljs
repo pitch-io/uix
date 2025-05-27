@@ -1,6 +1,7 @@
 (ns uix.examples
   (:require ["@tanstack/react-router" :as rr]
             [cljs-bean.core :as bean]
+            [cljs.spec.alpha :as s]
             [uix.core :as uix :refer [$ defui]]
             [uix.dom]))
 
@@ -42,12 +43,39 @@
 (defn unescape-text [s]
   (.-textContent (.-documentElement (.parseFromString dom-parser s "text/html"))))
 
+(s/def :link/href string?)
+
+(s/def ::link
+  (s/keys :req-un [:link/href]))
+
+(defui link [{:keys [href children]}]
+  {:props [::link]}
+  ($ :a.text-sm.text-emerald-50.mb-1.block.hover:underline
+     {:href href
+      :target "_blank"}
+     children))
+
+(s/def :story/by string?)
+(s/def :story/score number?)
+(s/def :story/time number?)
+(s/def :story/title string?)
+(s/def :story/url string?)
+(s/def :story/kids
+  (s/coll-of number? :min-count 0))
+
+(s/def :story/data
+  (s/keys :req-un [:story/by :story/score :story/time :story/title]
+          :opt-un [:story/url
+                   :story/kids]))
+
+(s/def ::story
+  (s/keys :req-un [:story/data]))
+
 (defui story [{:keys [data]}]
+  {:props [::story]}
   (let [{:keys [by score time title url kids]} data]
     ($ :div.text-stone-800.px-4.py-2.bg-emerald-600.border-b.border-emerald-700.hover:bg-emerald-700
-       ($ :a.text-sm.text-emerald-50.mb-1.block.hover:underline
-          {:href url
-           :target "_blank"}
+       ($ link {:href url}
           title)
        ($ :div.text-xs.flex.gap-2
          ($ :div "by "

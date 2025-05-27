@@ -7,8 +7,9 @@
             [uix.hooks.alpha :as hooks]
             [uix.compiler.aot]
             [uix.lib :refer [doseq-loop map->js]]
-            [cljs-bean.core :as bean]
-            [preo.core]))
+            [cljs-bean.core :as bean]))
+
+(def props-assert-fn (atom (fn [& args] true)))
 
 (def ^:dynamic *current-component*)
 
