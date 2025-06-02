@@ -1,0 +1,21 @@
+app = "uix-rsc-movies"
+primary_region = "fra"
+kill_signal = "SIGINT"
+kill_timeout = "60s"
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  [http_service.concurrency]
+    type = "requests"
+    soft_limit = 200
+    hard_limit = 250
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "1024MB"

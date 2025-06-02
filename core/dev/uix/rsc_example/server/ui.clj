@@ -91,9 +91,9 @@
 (defui fav-form [{:keys [id]}]
   (let [liked? (db/fav? db/*sid* id)]
     ($ :form {:action (rsc/partial actions/update-fav {:id id :intent (if liked? :remove :add)})}
-       ($ ui/fav-button {:liked? liked?})
-       ($ :input {:type :file :name :my-file}))))
+       ($ ui/fav-button {:liked? liked?}))))
 
+;; todo: reload client when server updates, in dev
 (defui movie-title [{:keys [id]}]
   (let [{:movies/keys [id title year thumbnail extract]
          :keys [cast_ids]}

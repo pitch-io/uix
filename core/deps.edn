@@ -31,4 +31,9 @@
                                    org.apache.commons/commons-text {:mvn/version "1.13.1"}
                                    http-kit/http-kit {:mvn/version "2.8.0"}
                                    compojure/compojure {:mvn/version "1.7.1"}
-                                   uix.dom/uix.dom {:local/root "../dom"}}}}}
+                                   com.github.seancorfield/next.jdbc {:mvn/version "1.3.1002"}
+                                   org.xerial/sqlite-jdbc {:mvn/version "3.49.1.0"}
+                                   uix.dom/uix.dom {:local/root "../dom"}}}
+           :build {:extra-paths ["dev"]
+                   :extra-deps {io.github.clojure/tools.build {:git/tag "v0.9.6" :git/sha "8e78bcc"}}
+                   :ns-default build}}}

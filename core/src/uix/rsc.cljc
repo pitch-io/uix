@@ -137,7 +137,7 @@
                        (.observe obs node)
                        #(.unobserve obs node))
                      [obs])]
-       ($ prefetcher-ctx {:value {:observe observe}}
+       ($ prefetcher-ctx {:value {:observe observe :level level}}
           children))))
 
 #?(:cljs
@@ -167,7 +167,7 @@
                #(rfe/start! router on-navigate {:use-fragment false})
                [router])]
        ($ router-context {:value {:route route}}
-         ($ prefetcher {:level :low}
+         ($ prefetcher {:level :disabled}
            resource)))))
 
 (defui ^:client link [props]
@@ -178,10 +178,11 @@
                            (fn [e]
                              (when handler (handler e))
                              (f e)))
-            {:keys [observe]} (uix/use prefetcher-ctx)]
+            {:keys [observe level]} (uix/use prefetcher-ctx)]
         ($ :a (-> props
                   (assoc :ref observe)
-                  (update :on-mouse-enter wrap-handler #(prefetch (:href props))))))))
+                  (update :on-mouse-enter wrap-handler #(when-not (= :disabled level)
+                                                          (prefetch (:href props)))))))))
 
 #?(:clj
    (defmacro defroutes [name routes]

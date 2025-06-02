@@ -1,6 +1,5 @@
 (ns uix.rsc-example.server.services
-  (:require [datomic.client.api :as d]
-            [org.httpkit.client :as http]
+  (:require [org.httpkit.client :as http]
             [cheshire.core :as json]
             [uix.rsc :as rsc]
             [uix.rsc-example.server.db :as db]))
