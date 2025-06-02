@@ -114,11 +114,9 @@
 
 (defn render-form-element [[tag attrs children :as el] sb]
   (let [action (:rsc/action attrs)
-        [action-id args] (if (partial-action? attrs)
-                           [(-> (nth action 1) meta :uix.rsc/action-id)
-                            (nth action 2 nil)]
-                           [(-> action meta :uix.rsc/action-id)
-                            []])
+        action-id (if (partial-action? attrs)
+                    (-> (nth action 1) meta :uix.rsc/action-id)
+                    (-> action meta :uix.rsc/action-id))
         ref-id (create-action-ref sb (atom {}) action-id [])
         attrs (-> attrs
                   (assoc :action ref-id)
@@ -185,9 +183,9 @@
                  [[:input {:type :hidden :name "_$action" :value (-> attrs :action meta :uix.rsc/action-id)}]]
                  (let [action (:action attrs)
                        action-id (-> action (nth 1) meta :uix.rsc/action-id)
-                       args (first (nth action 2 []))]
+                       args (nth action 2)]
                    [[:input {:type :hidden :name "_$action" :value action-id}]
-                    [:input {:type :hidden :name "_$args" :value (str args)}]]))]
+                    [:input {:type :hidden :name "_$bound" :value (str args)}]]))]
     [tag attrs (into fields children)]))
 
 (defn- unwrap-dom-element [el sb]

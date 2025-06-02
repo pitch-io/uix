@@ -230,21 +230,25 @@
        (edn/read (PushbackReader. reader)))))
 
 #?(:clj
+   (def ^:dynamic *bound-cache*))
+
+#?(:clj
    (defn handle-action
      "client payload -> executes server action"
      [{:keys [multipart-params body headers]}]
      (let [content-type (headers "content-type")
-           args (edn/read-string (multipart-params "_$args"))
            {:keys [action args]} (cond
                                    (str/starts-with? content-type "multipart/form-data")
                                    {:action (multipart-params "_$action")
-                                    :args (->> (dissoc multipart-params "_$action" "_$args")
-                                               (reduce-kv #(assoc %1 (keyword %2) %3) {})
-                                               (merge args))}
+                                    :args (->> (dissoc multipart-params "_$action" "_$bound")
+                                               (reduce-kv #(assoc %1 (keyword %2) %3) {}))}
                                    (= content-type "text/edn") (read-edn-stream body)
                                    :else (throw (IllegalArgumentException. "Unhandled server action: unknown content-type " content-type)))]
        (if-let [handler (get (all-actions) action)]
-         (handler args)
+         (if-some [bound (multipart-params "_$bound")]
+           (let [get-bound (:get-bound *bound-cache*)]
+             (handler (into args (get-bound bound))))
+           (handler args))
          (throw (IllegalArgumentException. (str "Unhandled action " action " " args)))))))
 
 (defn use-client [{:keys [fallback]} & [child]]
@@ -271,8 +275,9 @@
            (set-done))))))
 
 #?(:clj
-   (defn partial [f & args]
-     [:rsc/partial f args]))
+   (defn partial [f args]
+     (let [{:keys [store-bound]} *bound-cache*]
+       [:rsc/partial f (store-bound args)])))
 
 #?(:clj
    (def ^:dynamic *cache*))

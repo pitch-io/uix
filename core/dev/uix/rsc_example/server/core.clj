@@ -15,8 +15,24 @@
             [uix.rsc-example.server.db :as db])
   (:import (java.io PipedInputStream PipedOutputStream)
            (java.nio ByteBuffer)
+           (java.security MessageDigest)
            (java.util.zip GZIPOutputStream))
   (:gen-class))
+
+(defn sha-256 [input]
+  (let [digest (MessageDigest/getInstance "SHA-256")
+        bytes (.digest digest (.getBytes input "UTF-8"))]
+    (apply str (map #(format "%02x" (bit-and % 0xff)) bytes))))
+
+;; use persistent LRU cache in prod
+(defonce session-db (atom {}))
+
+(def actions-context
+  {:store-bound (fn [args]
+                  (let [id (sha-256 (str (hash args)))]
+                    (swap! session-db assoc id args)
+                    id))
+   :get-bound #(get @session-db %)})
 
 (def router
   (rer/router routes))
@@ -110,10 +126,12 @@
 (defroutes server-routes
   (route/files "/" {:root "./"})
   (GET "/*" req
-    (binding [db/*sid* (get-session req)]
+    (binding [db/*sid* (get-session req)
+              rsc/*bound-cache* actions-context]
       (handle-route req)))
   (POST "/*" req
-    (binding [db/*sid* (get-session req)]
+    (binding [db/*sid* (get-session req)
+              rsc/*bound-cache* actions-context]
       (handle-action req)))
   (resp/not-found "404"))
 
