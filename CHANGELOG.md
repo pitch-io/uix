@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 1.4.4
+
+### New
+
+- Enable props validation only in dev, via preload
+- Add more clj-kondo linting rules for `defui` and hooks
+- Remove `set-optimizations-enabled!`, doesn't work as intended
+
+### Fixes
+
+- JVM SSR: Correctly serialize self-closing HTML tags #231
+
 ## 1.4.3
 
 ### Fixes
