@@ -149,6 +149,10 @@
          (for [id movie_ids]
            ($ movie-title {:key id :id id}))))))
 
+(defui img [{:keys [thumbnail]}]
+  ($ :img {:class "h-[435px] object-cover mb-4"
+           :src thumbnail}))
+
 (defui movie [{:keys [params]}]
   (let [{:keys [id]} params
         {:movies/keys [thumbnail title extract]
@@ -156,8 +160,7 @@
         (db/fetch-movie id)]
     ($ :div {:class "p-12 items-center flex flex-col gap-y-12 lg:items-start lg:w-5xl lg:mx-auto lg:flex-row lg:gap-x-12"}
       ($ :div {:class "w-[296px] flex-none flex flex-col gap-y-2"}
-         ($ :img {:class "h-[435px] object-cover mb-4"
-                  :src thumbnail})
+         ($ img {:thumbnail thumbnail})
          ($ fav-form {:id id}))
       ($ :div {:class "flex-1 flex flex-col gap-y-8"}
          ($ :h1 {:class "font-instrumentSerif leading-[125%] text-6xl"}

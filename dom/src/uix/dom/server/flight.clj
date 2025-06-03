@@ -165,10 +165,13 @@
 
 (defn- unwrap-component-element [[tag :as el] sb]
   (let [props (normalize-props el)
-        v (loader/with-loader
-            (if (seq props)
-              (tag props)
-              (tag)))]
+        v (try
+            (loader/with-loader
+              (if (seq props)
+                (tag props)
+                (tag)))
+            (catch Throwable e
+              e))]
     (-unwrap v sb)))
 
 (defn- unwrap-fragment-element [[tag attrs & children] sb]
@@ -205,12 +208,7 @@
 
 (defn- unwrap-suspense-element [[tag {:keys [fallback children]}] sb]
   (let [to-id (str (gensym "B:"))
-        futures (map #(async/thread
-                        (try
-                          (-unwrap % sb)
-                          (catch Throwable e
-                            e)))
-                     children)
+        futures (map #(async/thread (-unwrap % sb)) children)
         tags (map #(serialize-blocking % sb :suspended "$L" to-id) futures)]
     [tag {:to-id to-id
           :fallback (-unwrap fallback sb)
@@ -255,14 +253,31 @@
     (-render (str this) sb))
 
   Throwable
-  ;; throwable serializer
   (-unwrap [this sb]
     this)
   (-render [this sb]
-    (str "E" (json/generate-string
-               {:digest ""
-                :name (str (type this))
-                :message (ex-message this)})))
+    (let [stack (->> (.getStackTrace this)
+                     (mapv (fn [^java.lang.StackTraceElement frame]
+                             (str/join " "
+                               ["    at"
+                                (str (.getClassName frame)
+                                     " "
+                                     (.getMethodName frame))
+                                (str
+                                  "("
+                                  (.getFileName frame)
+                                  ":"
+                                  (.getLineNumber frame)
+                                  ")")])))
+                     (into [(str (type this) ": " (ex-message this))])
+                     (str/join "\n"))
+          src (str "E" (json/generate-string
+                         {:digest ""
+                          :name (str (type this))
+                          :message (str (type this) " " (ex-message this))
+                          :stack stack}))
+          id (get-cached-id sb :errors src)]
+      (str "$L" id)))
 
   IBlockingDeref
   ;; async values serializer
@@ -298,7 +313,8 @@
          :pending {}
          :suspended {}
          :imports {}
-         :refs {}}))
+         :refs {}
+         :errors {}}))
 
 (defn- render-result [src result sb]
   (let [id (get-id sb)]
@@ -311,12 +327,13 @@
                     (render-result src result sb)
                     [(emit-row 0 (-render src sb))])
         imports (mapv #(apply emit-row %) (:imports @sb))
-        refs (mapv #(apply emit-row %) (:refs @sb))]
+        refs (mapv #(apply emit-row %) (:refs @sb))
+        errors (mapv #(apply emit-row %) (:errors @sb))]
     ;; flight stream structure
     ;; 1. imports/client refs
     ;; 2. ui structure interleaved with async values
     (async/go
-      (on-chunk (str/join "" (into (into imports refs) root-rows)))
+      (on-chunk (str/join "" (into (into (into imports refs) root-rows) errors)))
       (loop [ch->id (->> @sb :pending vals (into {}))]
         (if (seq ch->id)
           (let [[v c] (async/alts! (keys ch->id))

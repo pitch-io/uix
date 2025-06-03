@@ -69,13 +69,10 @@
 
 #?(:cljs
    (defn- exec-server-action [id args]
-     ;; todo: calling server actions from client side, should create FormData
-     (let [form? (instance? js/FormData (first args))
-           result (rsd-client/createFromFetch
+     (let [result (rsd-client/createFromFetch
                     (js/fetch (str js/location.pathname "?_rsc")
                       #js {:method "POST"
-                           :body (if form? (first args) (str {:id id :args args}))
-                           :headers (if form? #js {} #js {:content-type "text/edn"})})
+                           :body (first args)})
                     #js {:moduleBaseURL "/"
                          :callServer exec-server-action})]
        (-> result
@@ -84,10 +81,20 @@
                     (.-result response)))))))
 
 #?(:cljs
+   (defn- create-direct-server-action [id args]
+     (js/fetch (str js/location.pathname "?_rsc")
+       #js {:method "POST"
+            :body (str {:id id :args args})
+            :headers #js {:content-type "text/edn"}})))
+
+#?(:cljs
    (defn- create-initial-flight-stream []
      (let [controller (atom nil)
            encoder (js/TextEncoder.)]
-       (js/document.addEventListener "DOMContentLoaded" #(some-> @controller (.close)))
+       (js/document.addEventListener "DOMContentLoaded"
+          (fn []
+            (some-> @controller (.close))
+            (set! (.. js/window -__FLIGHT_DATA) nil)))
        (rsd-client/createFromReadableStream
          (js/ReadableStream.
            #js {:start (fn [ctrl]
@@ -106,10 +113,12 @@
             :callServer exec-server-action})))
 
 #?(:cljs
-   (defn- init-rsc [ssr-enabled]
-     (if ssr-enabled
-       (create-initial-flight-stream)
-       (create-from-fetch {:path js/location.pathname}))))
+   (def ^:private init-rsc
+     (memoize
+       (fn [ssr-enabled]
+         (if ssr-enabled
+           (create-initial-flight-stream)
+           (create-from-fetch {:path js/location.pathname}))))))
 
 #?(:cljs
    (def prefetcher-ctx (uix/create-context {})))
@@ -141,6 +150,36 @@
           children))))
 
 #?(:cljs
+   (def error-boundary
+     (uix/create-error-boundary
+       {:display-name "uix.rsc/error-boundary"
+        :derive-error-state (fn [error] {:error error})
+        :did-catch (fn [error info])}
+       (fn [[state] {:keys [children]}]
+         (if-let [error (:error state)]
+           ($ :div {:style {:width "100vw"
+                            :height "100vh"
+                            :display :flex
+                            :justify-content :center
+                            :padding "32px 0 0"}}
+             ($ :div {:style {:max-width 800}}
+               ($ :div {:style {:color "rgb(206, 17, 38)"
+                                :font-size 21}}
+                  (.-message error))
+               ($ :pre {:style {:font-size 12
+                                :max-height 360
+                                :overflow-y :auto
+                                :background-color "rgba(206, 17, 38, 0.05)"
+                                :margin "24px 0 16px"
+                                :padding 8
+                                :border-radius 5}}
+                  ($ :code (.-stack error)))
+               ($ :div {:style {:font-size 12
+                                :color "#5a5a5a"}}
+                  "This screen is visible only in development. It will not appear if the app crashes in production. Open your browser’s developer console to further inspect this error.")))
+           children)))))
+
+#?(:cljs
    (defui router
      ;; link pressed -> url change -> request server render -> update DOM
      [{:keys [ssr-enabled routes]}]
@@ -148,7 +187,7 @@
            router (uix/use-memo #(reset! router- (rf/router routes))
                                 [routes])
            [route set-route] (uix/use-state #(r/match-by-path router js/location.pathname))
-           [resource set-resource] (uix/use-state #(init-rsc ssr-enabled))
+           [resource set-resource] (uix/use-state (init-rsc ssr-enabled))
            _ (reset! hacky-update-rsc-fn- (fn [resource]
                                             (uix/start-transition #(set-resource resource))))
            on-navigate (uix/use-effect-event
@@ -168,7 +207,9 @@
                [router])]
        ($ router-context {:value {:route route}}
          ($ prefetcher {:level :disabled}
-           resource)))))
+           (if ^boolean goog.DEBUG
+             ($ error-boundary resource)
+             resource))))))
 
 (defui ^:client link [props]
   #?(:clj ($ :a props)
@@ -198,7 +239,7 @@
 
 #?(:cljs
    (defn create-server-ref [id]
-     (rsd-client/createServerReference id exec-server-action)))
+     (rsd-client/createServerReference id create-direct-server-action)))
 
 #?(:clj
    (defmacro defaction
@@ -237,19 +278,21 @@
      "client payload -> executes server action"
      [{:keys [multipart-params body headers]}]
      (let [content-type (headers "content-type")
-           {:keys [action args]} (cond
-                                   (str/starts-with? content-type "multipart/form-data")
-                                   {:action (multipart-params "_$action")
-                                    :args (->> (dissoc multipart-params "_$action" "_$bound")
-                                               (reduce-kv #(assoc %1 (keyword %2) %3) {}))}
-                                   (= content-type "text/edn") (read-edn-stream body)
-                                   :else (throw (IllegalArgumentException. "Unhandled server action: unknown content-type " content-type)))]
-       (if-let [handler (get (all-actions) action)]
-         (if-some [bound (multipart-params "_$bound")]
+           multipart? (str/starts-with? content-type "multipart/form-data")
+           bound (multipart-params "_$bound")
+           {:keys [id args]} (cond
+                               multipart?
+                               {:id (multipart-params "_$action")
+                                :args (->> (dissoc multipart-params "_$action" "_$bound")
+                                           (reduce-kv #(assoc %1 (keyword %2) %3) {}))}
+                               (= content-type "text/edn") (read-edn-stream body)
+                               :else (throw (IllegalArgumentException. "Unhandled server action: unknown content-type " content-type)))]
+       (if-let [handler (get (all-actions) id)]
+         (if (and multipart? bound)
            (let [get-bound (:get-bound *bound-cache*)]
              (handler (into args (get-bound bound))))
            (handler args))
-         (throw (IllegalArgumentException. (str "Unhandled action " action " " args)))))))
+         (throw (IllegalArgumentException. (str "Unhandled action " id " " args)))))))
 
 (defn use-client [{:keys [fallback]} & [child]]
   (let [[mounted? set-mounted] (uix/use-state false)]
@@ -342,7 +385,8 @@
              *state (volatile! :state/root)]
          ;; initial html -> streaming html helpers -> streamed flight payload -> suspended flight + html chunks
          (on-chunk (str "<!DOCTYPE html>" (dom.server/render-to-string ast)))
-         (on-chunk suspense-cleanup-js)
+         (when (seq (:suspended @sb))
+           (on-chunk suspense-cleanup-js))
          (on-chunk "<script>window.__FLIGHT_DATA ||= [];</script>")
          (server.flight/render-to-flight-stream ast {:on-chunk handle-chunk :sb sb :cache *cache*})
          (stream-suspended sb handle-chunk set-done
