@@ -77,22 +77,36 @@
         (do (.write gzip (.getBytes chunk "UTF-8"))
             (.flush gzip))))))
 
-(defn rsc-handler [request & {:keys [result]}]
-  (let [route (r/match-by-path router (:uri request))]
-    ;; request -> route -> react flight rows -> response stream
-    (server/as-channel request
-      {:on-open (fn [ch]         ;; use compression on reverse proxy in prod
-                  (let [on-chunk (with-gzip request ch "text/x-component; charset=utf-8")]
-                    (rsc/render-to-flight-stream ($ server.root/page {:route route})
-                      {:on-chunk on-chunk :result result})))})))
+(def error-boundary
+  (uix/create-error-boundary
+    {:derive-error-state (fn [error] {:error error})}
+    (fn [[state] {:keys [children]}]
+      (if-let [error (:error state)]
+        ($ server.root/html-page
+           ($ :h1.text-5xl.text-center "Something went wrong"))
+        children))))
 
-(defn html-handler [request]
+(defn render-response [{:keys [content-type result]} render-fn request]
   (when-let [route (r/match-by-path router (:uri request))]
     (server/as-channel request
-      {:on-open (fn [ch]
-                  (let [on-chunk (with-gzip request ch "text/html; charset=utf-8")]
-                    (rsc/render-to-html-stream ($ server.root/page {:route route})
-                      {:on-chunk on-chunk})))})))
+      {:on-open (fn [ch]         ;; use compression on reverse proxy in prod
+                  (let [on-chunk (with-gzip request ch content-type)]
+                    (render-fn
+                      ($ error-boundary ($ server.root/page {:route route}))
+                      {:on-chunk on-chunk :result result})))})))
+
+(defn rsc-handler [request & {:keys [result]}]
+  (render-response
+    {:content-type "text/x-component; charset=utf-8"
+     :result result}
+    rsc/render-to-flight-stream
+    request))
+
+(defn html-handler [request]
+  (render-response
+    {:content-type "text/html; charset=utf-8"}
+    rsc/render-to-html-stream
+    request))
 
 (defn rsc-action-handler [request]
   (try

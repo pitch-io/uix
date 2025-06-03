@@ -137,7 +137,7 @@
             rsc-id (str *ns* "/" fname)]
         `(def ~fname
            (with-meta
-             (core/fn [& ~args-sym]
+             (core/fn ~(symbol (str "comp-" fname)) [& ~args-sym]
                ~(with-props-cond props-cond `(first ~args-sym))
                (let [~args ~args-sym
                      ~(or rest-sym `_#) (dissoc (first ~args-sym) ~@dissoc-ks)]

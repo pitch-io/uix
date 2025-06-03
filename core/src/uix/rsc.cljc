@@ -2,8 +2,10 @@
   #?(:clj (:refer-clojure :exclude [partial]))
   #?(:cljs (:require-macros [uix.rsc]))
   (:require #?@(:cljs [["@roman01la/react-server-dom-esm/client" :as rsd-client]
+                       [cljs-bean.core :as bean]
                        [clojure.edn :as edn]
                        [clojure.walk :as walk]
+                       [clojure.string :as str]
                        [reitit.core :as r]
                        [reitit.frontend :as rf]
                        [reitit.frontend.easy :as rfe]])
@@ -164,16 +166,50 @@
                             :padding "32px 0 0"}}
              ($ :div {:style {:max-width 800}}
                ($ :div {:style {:color "rgb(206, 17, 38)"
-                                :font-size 21}}
+                                :font-size 21
+                                :margin-bottom 24}}
                   (.-message error))
-               ($ :pre {:style {:font-size 12
-                                :max-height 360
-                                :overflow-y :auto
-                                :background-color "rgba(206, 17, 38, 0.05)"
-                                :margin "24px 0 16px"
-                                :padding 8
-                                :border-radius 5}}
-                  ($ :code (.-stack error)))
+               (let [{:keys [src line start-line frame-line name]}
+                     (bean/bean (or js/window.__ERROR_SRC (.-digest error)))]
+                 ($ :<>
+                   ($ :div {:style {:font-size 12
+                                    :color "#5a5a5a"}}
+                      name)
+                   ($ :pre {:style {:font-size 12
+                                    :max-height 360
+                                    :overflow-y :auto
+                                    :background-color "rgba(206, 17, 38, 0.05)"
+                                    :margin "16px 0"
+                                    :padding "8px 0"
+                                    :border-radius 5}}
+                      ($ :code
+                        (->> (str/split-lines src)
+                             (map-indexed (fn [idx ln]
+                                            (if (= idx line)
+                                              ($ :div {:key idx
+                                                       :style {:background-color "#ff000047"
+                                                               :padding "0 8px"}}
+                                                 (str (+ start-line idx) "  ")
+                                                 ln)
+                                              ($ :div {:key idx
+                                                       :style {:padding "0 8px"}}
+                                                 (str (+ start-line idx) "  ")
+                                                 ln)))))))
+                   ($ :pre {:style {:font-size 12
+                                    :max-height 360
+                                    :overflow-y :auto
+                                    :background-color "rgba(206, 17, 38, 0.05)"
+                                    :margin "24px 0 16px"
+                                    :padding "8px 0"
+                                    :border-radius 5}}
+                      ($ :code
+                         (->> (str/split-lines (.-stack error))
+                              (map-indexed (fn [idx ln]
+                                             ($ :div
+                                                {:key idx
+                                                 :style {:background-color (when (= idx frame-line) "#ff000047")
+                                                         :padding "0 8px"}}
+                                               ln))))))))
                ($ :div {:style {:font-size 12
                                 :color "#5a5a5a"}}
                   "This screen is visible only in development. It will not appear if the app crashes in production. Open your browser’s developer console to further inspect this error.")))
@@ -376,10 +412,13 @@
        (let [done-count (atom 0)
              set-done #(when (== 2 (swap! done-count inc))
                          (on-chunk :done))
-             handle-chunk #(if (= :done %)
-                             (set-done)
-                             (on-chunk (str "<script>window.__FLIGHT_DATA.push(" (json/generate-string %) ");</script>")))
              sb (server.flight/create-state)
+             emit-error #(when (seq (:error-component @sb))
+                           ;; todo: only in dev
+                           (on-chunk (str "<script>window.__ERROR_SRC = " (json/generate-string (:error-component @sb)) ";</script>")))
+             handle-chunk #(if (= :done %)
+                             (do (emit-error) (set-done))
+                             (on-chunk (str "<script>window.__FLIGHT_DATA.push(" (json/generate-string %) ");</script>")))
              ast (loader/run-with-loader
                    #(server.flight/-unwrap src sb))
              *state (volatile! :state/root)]
@@ -389,6 +428,7 @@
            (on-chunk suspense-cleanup-js))
          (on-chunk "<script>window.__FLIGHT_DATA ||= [];</script>")
          (server.flight/render-to-flight-stream ast {:on-chunk handle-chunk :sb sb :cache *cache*})
+         ;; todo: handle errors in suspended blocks
          (stream-suspended sb handle-chunk set-done
            (fn [to-id element]
              (let [ssb (dom.server/make-static-builder)

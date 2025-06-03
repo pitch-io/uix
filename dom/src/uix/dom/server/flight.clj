@@ -1,13 +1,17 @@
 (ns uix.dom.server.flight
-  (:require [clojure.string :as str]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.walk :as walk]
             [uix.compiler.attributes :as attrs]
-            [uix.core :refer [$ defui]]
             [uix.dom.server :as dom.server]
             [uix.rsc.loader :as loader]
             [cheshire.core :as json]
             [clojure.core.async :as async])
-  (:import [clojure.lang IBlockingDeref IPersistentVector ISeq]))
+  (:import [clojure.lang IBlockingDeref IPersistentVector ISeq]
+           (java.io LineNumberReader PushbackReader)))
+
+(defn- dev? []
+  (some? (System/getenv "RSC_DEV")))
 
 (defprotocol FlightRenderer
   (-unwrap [this sb]
@@ -163,6 +167,8 @@
     (keyword? tag) (render-dom-element el sb)
     :else (throw (IllegalArgumentException. (str (type tag) " " tag " is not a valid element type")))))
 
+(defrecord RenderingError [^Throwable error var])
+
 (defn- unwrap-component-element [[tag :as el] sb]
   (let [props (normalize-props el)
         v (try
@@ -171,7 +177,10 @@
                 (tag props)
                 (tag)))
             (catch Throwable e
-              e))]
+              (if (dev?)
+                (let [v (-> tag meta :rsc/id symbol resolve)]
+                  (RenderingError. e v))
+                (throw e))))]
     (-unwrap v sb)))
 
 (defn- unwrap-fragment-element [[tag attrs & children] sb]
@@ -214,6 +223,75 @@
           :fallback (-unwrap fallback sb)
           :children tags}]))
 
+(defn- source-fn [v]
+  (when-let [filepath (:file (meta v))]
+    (with-open [rdr (LineNumberReader. (io/reader (io/resource filepath)))]
+      (dotimes [_ (dec (:line (meta v)))] (.readLine rdr))
+      (let [text (StringBuilder.)
+            pbr (proxy [PushbackReader] [rdr]
+                  (read [] (let [i (proxy-super read)]
+                             (.append text (char i))
+                             i)))
+            read-opts (if (.endsWith ^String filepath "cljc") {:read-cond :allow} {})]
+        (if (= :unknown *read-eval*)
+          (throw (IllegalStateException. "Unable to read source while *read-eval* is :unknown."))
+          (read read-opts (PushbackReader. pbr)))
+        (str text)))))
+
+(defn- render-error [^RenderingError this sb]
+  (let [{:keys [^Throwable error var]} this
+        st (.getStackTrace error)
+        stack (->> st
+                   (mapv (fn [^java.lang.StackTraceElement frame]
+                           (str/join " "
+                             ["    at"
+                              (str (.getClassName frame)
+                                   " "
+                                   (.getMethodName frame))
+                              (str
+                                "("
+                                (.getFileName frame)
+                                ":"
+                                (.getLineNumber frame)
+                                ")")])))
+                   (into [(str (type error) ": " (ex-message error))])
+                   (str/join "\n"))
+        component-src (source-fn var)
+        {:keys [line ns name]} (meta var)
+        component-ns (str (-> ns str munge) "$comp_")
+        [frame-line error-line] (reduce
+                                  (fn [[idx _] ^java.lang.StackTraceElement f]
+                                    (if (str/starts-with? (.getClassName f) component-ns)
+                                      (reduced [(inc idx) (.getLineNumber f)])
+                                      [(inc idx) nil]))
+                                  [0 nil]
+                                  st)
+        marker-line-offset (- (or error-line line) line)
+        error-component {:src component-src
+                         :line marker-line-offset
+                         :start-line line
+                         :frame-line frame-line
+                         :name (str ns "/" name)}
+        src (str "E" (json/generate-string
+                       {:digest error-component
+                        :name (str (type error))
+                        :message (str (type error) " " (ex-message error))
+                        :stack stack}))
+        id (get-cached-id sb :errors src)]
+    (swap! sb assoc :error-component error-component)
+    (str "$L" id)))
+
+(defn- unwrap-error-boundary [[f & args] sb]
+  (let [{:keys [display-name render-fn did-catch derive-error-state]} f
+        props {:children args}]
+    (try
+      (-> (render-fn [nil identity] props)
+          (-unwrap sb))
+      (catch Exception e
+        (when did-catch (did-catch e display-name))
+        (-> (render-fn [(derive-error-state e) identity] props)
+            (-unwrap sb))))))
+
 (defn unwrap-element [[tag :as el] sb]
   (cond
     (client-component? tag) el
@@ -221,6 +299,7 @@
     (= :<> tag) (unwrap-fragment-element el sb)
     (= :uix.core/suspense tag) (unwrap-suspense-element el sb)
     (keyword? tag) (unwrap-dom-element el sb)
+    (and (map? tag) (-> tag meta :uix.core/error-boundary)) (unwrap-error-boundary el sb)
     :else (throw (IllegalArgumentException. (str (type tag) " " tag " is not a valid element type")))))
 
 (extend-protocol FlightRenderer
@@ -252,32 +331,12 @@
   (-render [this sb]
     (-render (str this) sb))
 
-  Throwable
+  RenderingError
   (-unwrap [this sb]
     this)
   (-render [this sb]
-    (let [stack (->> (.getStackTrace this)
-                     (mapv (fn [^java.lang.StackTraceElement frame]
-                             (str/join " "
-                               ["    at"
-                                (str (.getClassName frame)
-                                     " "
-                                     (.getMethodName frame))
-                                (str
-                                  "("
-                                  (.getFileName frame)
-                                  ":"
-                                  (.getLineNumber frame)
-                                  ")")])))
-                     (into [(str (type this) ": " (ex-message this))])
-                     (str/join "\n"))
-          src (str "E" (json/generate-string
-                         {:digest ""
-                          :name (str (type this))
-                          :message (str (type this) " " (ex-message this))
-                          :stack stack}))
-          id (get-cached-id sb :errors src)]
-      (str "$L" id)))
+    ;; todo: only in dev
+    (render-error this sb))
 
   IBlockingDeref
   ;; async values serializer
@@ -314,7 +373,8 @@
          :suspended {}
          :imports {}
          :refs {}
-         :errors {}}))
+         :errors {}
+         :error-component {}}))
 
 (defn- render-result [src result sb]
   (let [id (get-id sb)]
@@ -341,18 +401,3 @@
             (on-chunk (emit-row id (-render v sb)))
             (recur (dissoc ch->id c)))
           (on-chunk :done))))))
-
-(comment
-  (do
-    (require 'uix.rsc)
-    (uix.rsc/defaction like-article []
-      1)
-    (defui page []
-      ($ :div
-         ($ :span @(future (Thread/sleep 1000) "hello"))
-         ($ :button "press me")))
-    (let [ast (-unwrap ($ page))]
-      (println (dom.server/render-to-string ast))
-      (render-to-flight-stream
-        ast
-        {:on-chunk println}))))
