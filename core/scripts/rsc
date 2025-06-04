@@ -8,3 +8,4 @@ npm ci
 
 echo "Starting examples build server..."
 npx concurrently "npx patch-package && clojure -A:examples -M -m shadow.cljs.devtools.cli watch rsc" "npx @tailwindcss/cli -i ./dev/uix/main.css -o ./rsc-out/main.css --watch"
+#npx concurrently "npx patch-package && clojure -A:examples -M -m shadow.cljs.devtools.cli release rsc" "npx @tailwindcss/cli -i ./dev/uix/main.css -o ./rsc-out/main.css --minify"

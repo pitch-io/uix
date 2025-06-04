@@ -129,6 +129,8 @@
                          (set! (.-current ^js this) (apply f (.-current ^js this) a b xs)))))))
      (.-current ref))))
 
+(def context-reg (atom {}))
+
 (defn create-context
   "Creates React Context with an optional default value"
   ([]

@@ -496,23 +496,37 @@
         (-> (render-fn [(derive-error-state e) identity] props)
             (-render-html *state sb))))))
 
+(defn- render-component-element! [[f props & children :as el] *state sb]
+  (-> (if (== (count el) 1)
+        (f)
+        (let [props (if (map? props)
+                      (cond-> (dissoc props :key)
+                        (seq children) (assoc :children children))
+                      {:children (into [props] children)})
+              props (if (:children props)
+                      (update props :children #(if (== 1 (count %)) (first %) %))
+                      props)]
+          (if (seq props) (f props) (f))))
+    (-render-html *state sb)))
+
+(defn- rsc-render-element-with-context! [el *state sb]
+  (push-thread-bindings (->> el meta :uix/context))
+  (try
+    (-render-html (vary-meta el dissoc :uix/context) *state sb)
+    (finally
+      (pop-thread-bindings))))
+
 (defn render-component! [[f props & children :as el] *state sb]
-  (if (-> f meta :uix.core/error-boundary)
+  (cond
+    (-> f meta :uix.core/error-boundary)
     (let [[_ & args] el]
       (render-error-boundary! f args *state sb))
-    (let [v (if (== (count el) 1)
-              (f)
-              (let [props (if (map? props)
-                            (cond-> (dissoc props :key)
-                              (seq children) (assoc :children children))
-                            {:children (into [props] children)})
-                    props (if (:children props)
-                            (update props :children #(if (== 1 (count %)) (first %) %))
-                            props)]
-                (if (seq props)
-                  (f props)
-                  (f))))]
-      (-render-html v *state sb))))
+    (seq (-> el meta :uix/context)) (rsc-render-element-with-context! el *state sb)
+    :else (render-component-element! el *state sb)))
+
+(defn- render-context-element! [element *state sb]
+  (let [[_ binder children] element]
+    (binder #(-render-html children *state sb))))
 
 (defn render-element!
   "Render an element vector as a HTML element."
@@ -520,12 +534,9 @@
   (when-not (empty? element)
     (let [tag (nth element 0 nil)]
       (cond
-        (identical? :uix/bind-context tag)
-        (let [binder (nth element 1 nil)
-              children (seq (nth element 2 nil))]
-          (binder #(-render-html children *state sb)))
+        (identical? :uix/context tag) (render-context-element! element *state sb)
         (identical? :<> tag) (render-fragment! element *state sb)
-        (identical? :uix.core/suspense tag) (render-suspense! element *state sb)
+        (identical? :uix/suspense tag) (render-suspense! element *state sb)
         (keyword? tag) (render-html-element! element *state sb)
         :else (render-component! element *state sb)))))
 

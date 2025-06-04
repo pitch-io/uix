@@ -245,6 +245,24 @@
 (defn use-ref [value]
   (hooks/use-ref value))
 
+(defn- create-context-with-ref [name value env]
+  `(def ~(with-meta name {:dynamic true})
+     (let [ctx# (create-context ~value)]
+       (swap! context-reg assoc ~(str (-> env :ns :name) "/" name) ctx#)
+       ctx#)))
+
+(defmacro defcontext
+  "cljs: Creates React context with initial value set to `value`.
+   clj: Create dynamic var bound to `value`."
+  ([name]
+   (if (uix.lib/cljs-env? &env)
+     (create-context-with-ref name nil &env)
+     `(def ~(with-meta name {:dynamic true :uix/context true}))))
+  ([name value]
+   (if (uix.lib/cljs-env? &env)
+     (create-context-with-ref name value &env)
+     `(def ~(with-meta name {:dynamic true :uix/context true}) ~value))))
+
 (defn use-context [value]
   (hooks/use-context value))
 
@@ -360,7 +378,7 @@
    `(uix.hooks.alpha/use-imperative-handle ~ref ~f ~(->js-deps deps))))
 
 (defui suspense [{:keys [fallback children] :as props}]
-  [::suspense props])
+  [:uix/suspense props])
 
 (defui strict-mode [{:keys [children]}]
   children)

@@ -79,7 +79,9 @@
 
 (def error-boundary
   (uix/create-error-boundary
-    {:derive-error-state (fn [error] {:error error})}
+    {:derive-error-state (fn [error] {:error error})
+     :did-catch (fn [error info]
+                  (prn error))}
     (fn [[state] {:keys [children]}]
       (if-let [error (:error state)]
         ($ server.root/html-page

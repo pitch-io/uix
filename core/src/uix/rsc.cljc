@@ -26,23 +26,28 @@
      (fn [props]
        (let [rsc-props (aget props "rsc/props")
              rsc-refs (aget props "rsc/refs")
+             children (aget props "children")
              props (uix/use-memo
-                     #(walk/postwalk
-                        (fn [form]
-                          ;; todo: maybe use data readers?
-                          (cond
-                            (and (string? form)
-                                 (.startsWith form "$")
-                                 rsc-refs)
-                            (let [ref (aget rsc-refs form)]
-                              (when ^boolean goog/DEBUG
-                                (when (nil? ref)
-                                  (js/console.error "server reference " ref " is not registered")))
-                              ref)
+                     #(let [{:uix/keys [context] :as edn-props} (edn/read-string rsc-props)
+                            edn-props (walk/postwalk
+                                        (fn [form]
+                                          ;; todo: maybe use data readers?
+                                          (cond
+                                            (and (string? form)
+                                                 (.startsWith form "$")
+                                                 rsc-refs)
+                                            (let [ref (aget rsc-refs form)]
+                                              (when ^boolean goog/DEBUG
+                                                (when (nil? ref)
+                                                  (js/console.error "server reference " ref " is not registered")))
+                                              ref)
 
-                            :else form))
-                        (edn/read-string rsc-props))
-                     [rsc-props rsc-refs])]
+                                            :else form))
+                                        (dissoc edn-props :uix/context))]
+                        (if (and context children)
+                          (assoc edn-props :children children :uix/context context)
+                          edn-props))
+                     [rsc-props rsc-refs children])]
          (uix.core/$ uix-comp props)))))
 
 #?(:cljs
@@ -170,31 +175,32 @@
                                 :margin-bottom 24}}
                   (.-message error))
                (let [{:keys [src line start-line frame-line name]}
-                     (bean/bean (or js/window.__ERROR_SRC (.-digest error)))]
+                     (bean/bean (or js/window.__ERROR_SRC (.-digest error) #js {}))]
                  ($ :<>
                    ($ :div {:style {:font-size 12
                                     :color "#5a5a5a"}}
                       name)
-                   ($ :pre {:style {:font-size 12
-                                    :max-height 360
-                                    :overflow-y :auto
-                                    :background-color "rgba(206, 17, 38, 0.05)"
-                                    :margin "16px 0"
-                                    :padding "8px 0"
-                                    :border-radius 5}}
-                      ($ :code
-                        (->> (str/split-lines src)
-                             (map-indexed (fn [idx ln]
-                                            (if (= idx line)
-                                              ($ :div {:key idx
-                                                       :style {:background-color "#ff000047"
-                                                               :padding "0 8px"}}
-                                                 (str (+ start-line idx) "  ")
-                                                 ln)
-                                              ($ :div {:key idx
-                                                       :style {:padding "0 8px"}}
-                                                 (str (+ start-line idx) "  ")
-                                                 ln)))))))
+                   (when src
+                     ($ :pre {:style {:font-size 12
+                                      :max-height 360
+                                      :overflow-y :auto
+                                      :background-color "rgba(206, 17, 38, 0.05)"
+                                      :margin "16px 0"
+                                      :padding "8px 0"
+                                      :border-radius 5}}
+                        ($ :code
+                          (->> (str/split-lines src)
+                               (map-indexed (fn [idx ln]
+                                              (if (= idx line)
+                                                ($ :div {:key idx
+                                                         :style {:background-color "#ff000047"
+                                                                 :padding "0 8px"}}
+                                                   (str (+ start-line idx) "  ")
+                                                   ln)
+                                                ($ :div {:key idx
+                                                         :style {:padding "0 8px"}}
+                                                   (str (+ start-line idx) "  ")
+                                                   ln))))))))
                    ($ :pre {:style {:font-size 12
                                     :max-height 360
                                     :overflow-y :auto

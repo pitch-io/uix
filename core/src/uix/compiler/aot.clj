@@ -119,10 +119,21 @@
                                                   [spread-props]))))
       v)))
 
+(defn- context-element? [[tag] env]
+  (and (symbol? tag)
+       (some-> (resolve env tag) meta :uix/context)))
+
+(defn- compile-context-provider [[var {:keys [value]} & children]]
+  [:uix/context `(fn [f#] (binding [~var ~value]
+                            (f#)))
+   (vec children)])
+
 (defn compile-element [v {:keys [env] :as opts}]
   (if (uix.lib/cljs-env? env)
     (compile-element* v opts)
-    (with-meta (with-spread-props v) {:uix/element? true})))
+    (if (context-element? v env)
+      (compile-context-provider v)
+      (with-meta (with-spread-props v) {:uix/element? true}))))
 
 ;; ========== forms rewriter ==========
 

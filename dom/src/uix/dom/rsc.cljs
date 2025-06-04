@@ -1,7 +1,8 @@
 (ns uix.dom.rsc
   (:require [uix.core :refer [defui $] :as uix]
             [uix.dom :as dom]
-            [uix.rsc]))
+            [uix.rsc]
+            [uix.rsc.context]))
 
 ;; Client references resolver
 ;; component ref -> component function

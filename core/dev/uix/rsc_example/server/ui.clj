@@ -1,6 +1,5 @@
 (ns uix.rsc-example.server.ui
-  (:require [cheshire.core :as json]
-            [clojure.string :as str]
+  (:require [clojure.string :as str]
             [uix.core :refer [defui $] :as uix]
             [uix.rsc :as rsc]
             [uix.rsc-example.actions :as actions]
@@ -93,6 +92,7 @@
     ($ :form {:action (rsc/partial actions/update-fav {:id id :intent (if liked? :remove :add)})}
        ($ ui/fav-button {:liked? liked?}))))
 
+
 ;; todo: reload client when server updates, in dev
 (defui movie-title [{:keys [id]}]
   (let [{:movies/keys [id title year thumbnail extract]
@@ -133,7 +133,7 @@
   (let [ids [32932, 23643, 29915, 30895, 31472, 33411]]
     ($ movie-grid
        (for [id ids]
-         ($ movie-title {:key id :id id})))))
+         ($ movie-title {:id id})))))
 
 (defui actor [{:keys [params]}]
   (let [{:keys [id]} params
@@ -147,7 +147,7 @@
            name))
       ($ movie-grid
          (for [id movie_ids]
-           ($ movie-title {:key id :id id}))))))
+           ($ movie-title {:id id}))))))
 
 (defui img [{:keys [thumbnail]}]
   ($ :img {:class "h-[435px] object-cover mb-4"
@@ -171,6 +171,6 @@
            ($ :div
               (->>
                 (for [id cast_ids]
-                  ($ :span {:key id}
+                  ($ :span
                      ($ actor-link {:id id})))
                 (interpose ($ :span.mx-1 "•")))))))))

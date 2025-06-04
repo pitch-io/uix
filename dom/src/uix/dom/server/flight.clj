@@ -4,6 +4,7 @@
             [clojure.walk :as walk]
             [uix.compiler.attributes :as attrs]
             [uix.dom.server :as dom.server]
+            [uix.rsc.context :as rsc.ctx]
             [uix.rsc.loader :as loader]
             [cheshire.core :as json]
             [clojure.core.async :as async])
@@ -78,17 +79,39 @@
                (seq children)
                (assoc :children (map #(-render % sb) children)))))
 
+(declare render-component-element-client-ref)
+
+(defn- make-context-provider-element [el sb]
+  (when-let [contexts (-> el meta :uix/context)]
+    (let [contexts (->> contexts
+                        (map (fn [[var v]] [(str/join "/" ((juxt :ns :name) (meta var))) v]))
+                        (into {}))
+          el [rsc.ctx/context-provider {:uix/context contexts}
+              (vary-meta el dissoc :uix/context)]]
+      (render-component-element-client-ref el sb :serialize-props? false))))
+
 (defn render-component-element-client-ref
-  [[tag :as el] sb]
+  [[tag :as el] sb & {:keys [serialize-props?]}]
   (let [rsc-id (:rsc/id (meta tag))
         [props refs] (with-client-refs sb (normalize-props el))
         ref-import (str "I" (json/generate-string ["rsc" rsc-id false]))
-        id (get-cached-id sb :imports ref-import)]
-    ["$" (str "$L" id)
-     (:key props)
-     (cond-> {}
-             (seq refs) (assoc "rsc/refs" refs)
-             (seq props) (assoc "rsc/props" (serialize-props sb props)))]))
+        id (get-cached-id sb :imports ref-import)
+        client-el ["$" (str "$L" id)
+                   (:key props)
+                   (cond-> {}
+                           (seq refs) (assoc "rsc/refs" refs)
+                           (seq props) (assoc "rsc/props" (if (false? serialize-props?)
+                                                            props
+                                                            (serialize-props sb props))))]]
+    (if-let [context-provider (make-context-provider-element el sb)]
+      (update context-provider 3
+        (fn [props]
+          (-> props
+              (dissoc "rsc/refs")
+              (assoc :children (list client-el))
+              (update "rsc/props" dissoc :children)
+              (update "rsc/props" #(serialize-props sb %)))))
+      client-el)))
 
 (defn render-component-element-server [[tag :as el] sb]
   (let [props (normalize-props el)
@@ -163,7 +186,7 @@
     (client-component? tag) (render-component-element-client-ref el sb)
     (fn? tag) (render-component-element-server el sb)
     (= :<> tag) (render-fragment-element el sb)
-    (= :uix.core/suspense tag) (render-suspense-element el sb)
+    (= :uix/suspense tag) (render-suspense-element el sb)
     (keyword? tag) (render-dom-element el sb)
     :else (throw (IllegalArgumentException. (str (type tag) " " tag " is not a valid element type")))))
 
@@ -225,7 +248,7 @@
 
 (defn- source-fn [v]
   (when-let [filepath (:file (meta v))]
-    (with-open [rdr (LineNumberReader. (io/reader (io/resource filepath)))]
+    (with-open [rdr (LineNumberReader. (io/reader (or (io/resource filepath) (io/file filepath))))]
       (dotimes [_ (dec (:line (meta v)))] (.readLine rdr))
       (let [text (StringBuilder.)
             pbr (proxy [PushbackReader] [rdr]
@@ -243,17 +266,21 @@
         st (.getStackTrace error)
         stack (->> st
                    (mapv (fn [^java.lang.StackTraceElement frame]
-                           (str/join " "
-                             ["    at"
-                              (str (.getClassName frame)
-                                   " "
-                                   (.getMethodName frame))
-                              (str
-                                "("
-                                (.getFileName frame)
-                                ":"
-                                (.getLineNumber frame)
-                                ")")])))
+                           (let [filename (.getFileName frame)
+                                 clj? (re-find #"\.cljc?$" filename)
+                                 class-name (cond-> (.getClassName frame)
+                                              clj? (clojure.lang.Compiler/demunge))]
+                             (str/join " "
+                               ["    at"
+                                (str class-name
+                                     " "
+                                     (.getMethodName frame))
+                                (str
+                                  "("
+                                  filename
+                                  ":"
+                                  (.getLineNumber frame)
+                                  ")")]))))
                    (into [(str (type error) ": " (ex-message error))])
                    (str/join "\n"))
         component-src (source-fn var)
@@ -292,12 +319,26 @@
         (-> (render-fn [(derive-error-state e) identity] props)
             (-unwrap sb))))))
 
+(defn- unwrap-context-element [element sb]
+  (let [[_ binder children] element]
+    (binder #(-unwrap children sb))))
+
+(defn- get-current-contexts []
+  (let [bindings (get-thread-bindings)
+        ks (->> (keys bindings)
+                (filter (comp :uix/context meta)))]
+    (select-keys bindings ks)))
+
+(defn- unwrap-client-component [el sb]
+  (vary-meta el assoc :uix/context (get-current-contexts)))
+
 (defn unwrap-element [[tag :as el] sb]
   (cond
-    (client-component? tag) el
+    (client-component? tag) (unwrap-client-component el sb)
     (fn? tag) (unwrap-component-element el sb)
     (= :<> tag) (unwrap-fragment-element el sb)
-    (= :uix.core/suspense tag) (unwrap-suspense-element el sb)
+    (= :uix/suspense tag) (unwrap-suspense-element el sb)
+    (= :uix/context tag) (unwrap-context-element el sb)
     (keyword? tag) (unwrap-dom-element el sb)
     (and (map? tag) (-> tag meta :uix.core/error-boundary)) (unwrap-error-boundary el sb)
     :else (throw (IllegalArgumentException. (str (type tag) " " tag " is not a valid element type")))))
@@ -305,9 +346,10 @@
 (extend-protocol FlightRenderer
   IPersistentVector
   (-unwrap [this sb]
-    (if (vector? (first this))
-      (map #(-unwrap % sb) this)
-      (unwrap-element this sb)))
+    (let [tag (first this)]
+      (if (vector? tag)
+        (doall (map #(-unwrap % sb) this))
+        (unwrap-element this sb))))
   (-render [this sb]
     (if (vector? (first this))
       (map #(-render % sb) this)
