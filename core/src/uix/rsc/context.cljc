@@ -1,5 +1,6 @@
 (ns uix.rsc.context
-  (:require [uix.core :refer [defui $]]))
+  (:require [uix.core :refer [defui $]]
+            #?(:cljs [uix.rsc])))
 
 #?(:cljs
    (defn- with-providers [context children]

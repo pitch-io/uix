@@ -2,6 +2,7 @@
   #?(:clj (:refer-clojure :exclude [partial]))
   #?(:cljs (:require-macros [uix.rsc]))
   (:require #?@(:cljs [["@roman01la/react-server-dom-esm/client" :as rsd-client]
+                       ["js.foresight" :as jsf]
                        [cljs-bean.core :as bean]
                        [clojure.edn :as edn]
                        [clojure.walk :as walk]
@@ -138,21 +139,33 @@
          (swap! rsc-cache assoc href (create-from-fetch {:path href} :priority "low"))))))
 
 #?(:cljs
+   (defonce fm (.-instance jsf/ForesightManager)))
+
+#?(:cljs
    (defui prefetcher [{:keys [level children]}]
-     (let [obs (uix/use-memo
-                 #(js/IntersectionObserver.
-                    (fn [entries]
-                      (when (= :high level)
-                        (doseq [entry entries]
-                          (when (.-isIntersecting entry)
-                            (let [url (js/URL. (.. entry -target -href))]
-                              (prefetch (.-pathname url))))))))
-                 [level])
-           observe (uix/use-callback
+     (let [observe (uix/use-callback
                      (fn [node]
-                       (.observe obs node)
-                       #(.unobserve obs node))
-                     [obs])]
+                       (case level
+                         :medium
+                         (-> (.register fm
+                                        #js {:element node
+                                             :hitSlop 0
+                                             :name (.. node -href)
+                                             :unregisterOnCallback true
+                                             :callback #(let [url (js/URL. (.. node -href))]
+                                                          (prefetch (.-pathname url)))})
+                             (.-unregister))
+                         :high (let [obs (js/IntersectionObserver.
+                                           (fn [entries]
+                                             (when (= :high level)
+                                               (doseq [entry entries]
+                                                 (when (.-isIntersecting entry)
+                                                   (let [url (js/URL. (.. entry -target -href))]
+                                                     (prefetch (.-pathname url))))))))]
+                                 (.observe obs node)
+                                 #(.unobserve obs node))
+                         nil))
+                     [level])]
        ($ prefetcher-ctx {:value {:observe observe :level level}}
           children))))
 
@@ -264,7 +277,7 @@
             {:keys [observe level]} (uix/use prefetcher-ctx)]
         ($ :a (-> props
                   (assoc :ref observe)
-                  (update :on-mouse-enter wrap-handler #(when-not (= :disabled level)
+                  (update :on-mouse-enter wrap-handler #(when (= :low level)
                                                           (prefetch (:href props)))))))))
 
 #?(:clj
