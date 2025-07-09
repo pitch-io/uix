@@ -72,12 +72,14 @@
 (s/def ::story
   (s/keys :req-un [:story/data]))
 
-(defui story [{:keys [data]}]
+(defui story [{:keys [data inc-value]}]
   {:props [::story]}
   (let [{:keys [by score time title url kids]} data]
     ($ :div.text-stone-800.px-4.py-2.bg-emerald-600.border-b.border-emerald-700.hover:bg-emerald-700
        ($ link {:href url}
           title)
+       ($ :button {:on-click inc-value}
+          "++")
        ($ :div.text-xs.flex.gap-2
          ($ :div "by "
             ($ :span.font-medium by))
@@ -110,9 +112,11 @@
                  (.toLocaleString (js/Date. (* 1e3 time))))))))))
 
 (defui stories []
-  (let [data (use-loader-data)]
+  (let [data (use-loader-data)
+        [value set-value] (uix/use-state 0)
+        inc-value #(set-value inc)]
     (for [d data]
-      ($ story {:key (:id d) :data d}))))
+      ($ story {:key (:id d) :data d :inc-value inc-value}))))
 
 (defui item []
   (let [{:keys [kids]} (use-loader-data)]
@@ -172,7 +176,7 @@
         routes (for [{:keys [path component loader]} routes]
                  (rr/createRoute #js {:getParentRoute (constantly root)
                                       :path path
-                                      :loader #(loader (bean/->clj %))
+                                      :loader #(loader (js->clj % :keywordize-keys true))
                                       :component component}))
         route-tree (.addChildren root (into-array routes))]
     (rr/createRouter #js {:routeTree route-tree})))

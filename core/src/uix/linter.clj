@@ -399,7 +399,7 @@
     ;; return only those that are local in `env`
     (filter #(get-in env [:locals % :name]) @syms)))
 
-(defn- find-free-variables [env f deps]
+(defn find-free-variable-nodes [env f deps]
   (let [ast (ana/analyze env f)
         deps (set deps)]
     (->> (ast->seq ast)
@@ -407,9 +407,12 @@
                        (get-in env [:locals (:name %) :name]) ;; from an outer scope
                        (or (-> % :info :shadow not) ;; but not a local shadowing locals from outer scope
                            (-> % :info :shadow :ns (= 'js))) ;; except when shadowing JS global
-                       (not (deps (:name %))))) ;; and not declared in deps vector
-         (map :name)
-         distinct)))
+                       (not (deps (:name %)))))))) ;; and not declared in deps vector
+
+(defn find-free-variables [env f deps]
+  (->> (find-free-variable-nodes env f deps)
+       (map :name)
+       distinct))
 
 (defmethod pp/code-dispatch JSValue [alis]
   (.write ^Writer *out* "#js ")
