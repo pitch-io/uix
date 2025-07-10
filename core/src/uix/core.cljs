@@ -241,6 +241,14 @@
   [resource]
   (hooks/use resource))
 
+(defn use-atom
+  "Takes an atom, subscribes UI component to changes in the atom
+  and returns its current value"
+  [ref]
+  (let [subscribe (hooks/use-batched-subscribe ref)
+        get-snapshot (hooks/use-callback #(-deref ref) #js [ref])]
+    (use-sync-external-store subscribe get-snapshot)))
+
 (defn as-react
   "Interop with React components. Takes a function that returns UIx component
   and returns same component wrapped into interop layer."

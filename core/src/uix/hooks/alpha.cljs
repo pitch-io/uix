@@ -1,7 +1,8 @@
 (ns uix.hooks.alpha
   "Wrappers for React Hooks"
   (:refer-clojure :exclude [use])
-  (:require [react :as r]))
+  (:require [react :as r]
+            [scheduler]))
 
 (defn- choose-value [nv cv]
   (if (= nv cv)
@@ -143,3 +144,31 @@
 
 (defn use [resource]
   (react/use resource))
+
+;;; ===========================
+
+(defn- use-batched-subscribe
+  "Takes an atom-like ref type and returns a function
+  that adds change listeners to the ref"
+  [^js ref]
+  (use-callback
+    (fn [listener]
+      ;; Adding an atom holding a set of listeners on a ref
+      (let [listeners (or (.-react-listeners ref) (atom #{}))]
+        (set! (.-react-listeners ref) listeners)
+        (swap! listeners conj listener)
+        (-add-watch ref ::listener
+          (fn [k r o n]
+            (when (not= o n)
+              (scheduler/unstable_scheduleCallback scheduler/unstable_ImmediatePriority
+                #(doseq [listener @listeners]
+                   (listener)))))))
+      (fn []
+        (let [listeners (.-react-listeners ref)]
+          (swap! listeners disj listener)
+          ;; When the last listener was removed,
+          ;; remove batched updates listener from the ref
+          (when (empty? @listeners)
+            (set! (.-react-listeners ref) nil))
+          (-remove-watch ref ::listener))))
+    #js [ref]))

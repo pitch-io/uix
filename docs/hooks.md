@@ -111,3 +111,21 @@ Here are some benefits of using `defhook`:
 1. Enforced naming convention: hooks names must start with `use-`. The macro performs compile time check.
 2. Enables hooks linting: the macro runs [built-in linter](/docs/code-linting.md) on the body of a custom hook, making sure that hooks are used correctly.
 3. (Future improvement) Optional linter rule to make sure that all hooks in application code are created via `defhook`.
+
+## ClojureScript specific hooks
+
+### `use-atom`
+
+For a quick global shared state
+
+```clojure
+(defonce state (atom 0))
+
+(defui counter []
+  (let [value (uix/use-atom state)]
+    ($ :div value)))
+
+(defui button []
+  ($ :button {:on-click #(swap! state inc)}
+    "+"))
+```
