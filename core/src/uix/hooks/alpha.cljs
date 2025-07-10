@@ -169,6 +169,6 @@
           ;; When the last listener was removed,
           ;; remove batched updates listener from the ref
           (when (empty? @listeners)
-            (set! (.-react-listeners ref) nil))
-          (-remove-watch ref ::listener))))
+            (set! (.-react-listeners ref) nil)
+            (-remove-watch ref ::listener)))))
     #js [ref]))
