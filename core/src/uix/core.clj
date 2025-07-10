@@ -105,7 +105,7 @@
         [fname args fdecl props-cond] (parse-defui-sig `defui sym fdecl)]
     (uix.linter/lint! sym fdecl &form &env)
     (if (uix.lib/cljs-env? &env)
-      (let [memo? (-> sym meta :memo)
+      (let [memo? (if-some [memo? (-> sym meta :memo)] memo? true)
             memo-sym (gensym fname)
             memo-fname (if memo?
                          (with-meta memo-sym (meta fname))
@@ -126,7 +126,8 @@
            (set-display-name ~memo-var-sym ~(str var-sym))
            ~(uix.dev/fast-refresh-signature memo-var-sym body)
            ~(when memo?
-              `(def ~fname (uix.core/memo ~memo-sym)))))
+              `(do (def ~fname (uix.core/memo ~memo-sym))
+                   (set-display-name ~fname ~(str memo-var-sym))))))
       (let [args-sym (gensym "args")
             [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
         `(defn ~fname [& ~args-sym]
