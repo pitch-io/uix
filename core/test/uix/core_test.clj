@@ -3,6 +3,7 @@
             [clojure.string :as str]
             [clojure.test :refer :all]
             [uix.core :as uix :refer [defui $ defcontext]]
+            [uix.compiler.aot :as aot]
             [cljs.analyzer :as ana]
             [preo.core]
             [uix.dom.server :as server]))
@@ -33,10 +34,18 @@
          (uix.core/->js-deps [1 2 3]))))
 
 (deftest test-$
-  (testing "in cljs env"
-    (with-redefs [uix.lib/cljs-env? (fn [_] true)
-                  ana/resolve-var (fn [_ _] nil)
-                  env/*compiler* (atom {})]
+  (binding [aot/*memo-disabled?* true]
+    (testing "in cljs env"
+      (with-redefs [uix.lib/cljs-env? (fn [_] true)
+                    ana/resolve-var (fn [_ _] nil)
+                    env/*compiler* (atom {})]
+        (is (= (macroexpand-1 '(uix.core/$ :h1))
+               '(uix.compiler.aot/>el "h1" (cljs.core/array nil) (cljs.core/array))))
+        (is (= (macroexpand-1 '(uix.core/$ identity {} 1 2))
+               '(uix.compiler.alpha/component-element identity (cljs.core/array {}) (cljs.core/array 1 2))))
+        (is (= (macroexpand-1 '(uix.core/$ identity {:x 1 :ref 2} 1 2))
+               '(uix.compiler.alpha/component-element identity (cljs.core/array {:x 1 :ref 2}) (cljs.core/array 1 2))))))
+    (testing "in clj env"
       (is (= (macroexpand-1 '(uix.core/$ :h1))
              '(js* "~{}(~{}, ...~{}, ...~{})" uix.compiler.alpha/create-element* "h1" (cljs.core/array nil) (cljs.core/array))))
       (is (= (macroexpand-1 '(uix.core/$ :button {:title "btn"} "press"))
@@ -44,16 +53,9 @@
       (is (= (macroexpand-1 '(uix.core/$ :button "press"))
              '(js* "~{}(~{}, ...~{}, ...~{})" uix.compiler.alpha/create-element* "button" (cljs.core/array nil "press") (cljs.core/array))))
       (is (= (macroexpand-1 '(uix.core/$ identity {} 1 2))
-             '(uix.compiler.alpha/component-element identity (cljs.core/array {}) (cljs.core/array 1 2))))
+             '[identity {} 1 2]))
       (is (= (macroexpand-1 '(uix.core/$ identity {:x 1 :ref 2} 1 2))
-             '(uix.compiler.alpha/component-element identity (cljs.core/array {:x 1 :ref 2}) (cljs.core/array 1 2))))))
-  (testing "in clj env"
-    (is (= (macroexpand-1 '(uix.core/$ :h1))
-           [:h1]))
-    (is (= (macroexpand-1 '(uix.core/$ identity {} 1 2))
-           '[identity {} 1 2]))
-    (is (= (macroexpand-1 '(uix.core/$ identity {:x 1 :ref 2} 1 2))
-           '[identity {:x 1 :ref 2} 1 2]))))
+             '[identity {:x 1 :ref 2} 1 2])))))
 
 (uix.core/defui clj-component [props] props)
 (deftest test-defui
