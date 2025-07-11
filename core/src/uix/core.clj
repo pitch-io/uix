@@ -105,7 +105,7 @@
         [fname args fdecl props-cond] (parse-defui-sig `defui sym fdecl)]
     (uix.linter/lint! sym fdecl &form &env)
     (if (uix.lib/cljs-env? &env)
-      (let [memo? (-> sym meta :memo)
+      (let [memo? (if-some [memo? (-> sym meta :memo)] memo? true)
             memo-sym (gensym fname)
             memo-fname (if memo?
                          (with-meta memo-sym (meta fname))
@@ -113,10 +113,12 @@
             var-sym (-> (str (-> &env :ns :name) "/" fname) symbol (with-meta {:tag 'js}))
             memo-var-sym (-> (str (-> &env :ns :name) "/" memo-fname) symbol (with-meta {:tag 'js}))
             [hoisted body] (-> (uix.dev/with-fast-refresh memo-var-sym fdecl)
-                               (aot/rewrite-forms :hoist? true :fname fname :force? (:test/inline (meta sym))))]
+                               (aot/rewrite-forms :hoist? true :fname fname :force? (:test/inline (meta sym))))
+            [cache-binds memo-decls body] (aot/emit-memoized &env args body)]
         (register-spec! props-cond ns sym)
-        `(do
+        `(let ~cache-binds
            ~@(aot/inline-elements hoisted &env true (:test/inline (meta sym)))
+           ~@memo-decls
            ~(if (empty? args)
               (no-args-component memo-fname memo-var-sym body)
               (with-args-component memo-fname memo-var-sym args body props-cond))
@@ -124,7 +126,8 @@
            (set-display-name ~memo-var-sym ~(str var-sym))
            ~(uix.dev/fast-refresh-signature memo-var-sym body)
            ~(when memo?
-              `(def ~fname (uix.core/memo ~memo-sym)))))
+              `(do (def ~fname (uix.core/memo ~memo-sym))
+                   (set-display-name ~fname ~(str memo-var-sym))))))
       (let [args-sym (gensym "args")
             [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
         `(defn ~fname [& ~args-sym]
