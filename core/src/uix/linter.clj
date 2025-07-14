@@ -228,7 +228,7 @@
       (lint-missing-key! :iter-fn sym body)
       (run! #(lint-body!* % :in-loop? true) body))))
 
-(defn- ast->seq [ast]
+(defn ast->seq [ast]
   (tree-seq :children (fn [{:keys [children] :as ast}]
                         (let [get-children (apply juxt children)]
                           (->> (get-children ast)
