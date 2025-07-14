@@ -123,10 +123,13 @@
   (some-fn keyword? number? string? nil? boolean?))
 
 (defn- has-hook-call? [form]
-  (or (true? (prewalk
-               #(or (uix.linter/hook-call? %) %)
-               form))
-      false))
+  (let [yep? (atom false)]
+    (prewalk
+      #(if (uix.linter/hook-call? %)
+         (reset! yep? true)
+         %)
+      form)
+    @yep?))
 
 (defn- memo-body [fdecl ast]
   (let [get-loc (juxt :line :column)
