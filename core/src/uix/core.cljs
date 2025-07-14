@@ -406,3 +406,10 @@
                 (uix.core/$ :div {:style {:font-size 13}}
                   "This screen is visible only in development. It will not appear if the app crashes in production. Open your browser's developer console to further inspect this error.")))))
         children))))
+
+(defn -use-cache-internal []
+  (let [cache (use-ref {})]
+    (use-effect-event
+      (fn [deps get-value]
+        (or (get @cache deps)
+            (get (swap! cache assoc deps (get-value)) deps))))))

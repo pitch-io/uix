@@ -85,90 +85,106 @@
 (def attrs-memo-reg (atom {}))
 (def elements-memo-reg (atom {}))
 
-(defn- resolve-var [env var-name]
-  (ana/gets @env/*compiler* ::ana/namespaces (-> env :ns :name) :defs var-name))
+(defn- resolve-local [env var-name]
+  (-> env :locals (get var-name)))
 
 (def ^:dynamic *memo-disabled?* false)
 
+(def ccache '-uix-ccahe)
+
+(defn- create-cache-lookup [var-name value deps]
+  `(~ccache ~(into [(str var-name)] deps) (fn [] ~value)))
+
 (defn with-memo-attrs [env attrs]
+  ;; caches element's literal props map
+  ;; {:title "string" :on-click handler} -> (memo {:title "string" :on-click handler} [handler]) <- deps
   (if *memo-disabled?*
     attrs
-    (let [var-name (symbol (str "memo-attrs" "-" (:line env) "-" (:column env)))
+    (let [var-name (symbol (str "a" (:line env) ":" (:column env)))
           ns (-> env :ns :name)]
-      (if-let [{:keys [var-name deps]} (get-in @attrs-memo-reg [ns var-name])]
+      (if-let [{:keys [var-name value deps]} (get-in @attrs-memo-reg [ns var-name])]
         (do
           (swap! attrs-memo-reg update ns dissoc var-name)
-          (if (resolve-var env var-name)
-            `(~var-name ~@deps)
+          (if (get-in env [:locals 'uix-memarker])
+            (create-cache-lookup var-name value deps)
             attrs))
         (if (seq attrs)
           (let [deps-nodes (uix.linter/find-free-variable-nodes env attrs [])
                 deps (->> deps-nodes (map :name) distinct vec)]
             (swap! attrs-memo-reg assoc-in [ns var-name] {:deps-nodes deps-nodes :deps deps :value attrs :var-name var-name})
             (if (get-in env [:locals 'uix-memarker])
-              `(~var-name ~@deps)
+              (create-cache-lookup var-name attrs deps)
               attrs))
           attrs)))))
 
 (declare prewalk)
 
-(defn- memo-body [fdecl reg cache-hit]
-  (let [get-loc (juxt :column :line)
-        loc->node (->> reg
-                       (mapcat :deps-nodes)
-                       distinct
-                       (map (juxt (comp get-loc :env) identity))
-                       (into {}))]
+(def literal?
+  (some-fn keyword? number? string? nil? boolean?))
+
+(defn- has-hook-call? [form]
+  (or (true? (prewalk
+               #(or (uix.linter/hook-call? %) %)
+               form))
+      false))
+
+(defn- memo-body [fdecl ast]
+  (let [get-loc (juxt :line :column)
+        ast-seq (uix.linter/ast->seq ast)
+        loc->env (->> (map vector ast-seq (next ast-seq))
+                      (reduce
+                        (fn [ret [node node-next]]
+                          (if (= :binding (:op node))
+                            (assoc ret (get-loc node) (:env node-next))
+                            ret))
+                        {}))]
     (prewalk
       (fn [x]
-        (if-not (and (list? x)
-                     (= 'let (first x))
-                     (vector? (second x)))
-          x
+        (cond
+          ;; memo let bindings (let [...] ...)
+          ;; TODO: destructuring assignment
+          (and (list? x) (= 'let (first x)) (vector? (second x)))
           (let [[_ bindings & body] x
                 bindings (->> bindings
                               (partition-all 2)
                               (mapcat (fn [[sym value]]
-                                        (let [loc (get-loc (meta sym))
-                                              [col line] loc]
-                                          (if-let [env (:env (loc->node loc))]
-                                            (let [deps (uix.linter/find-free-variables env value [])]
-                                              [sym `(~cache-hit ~(into [(str col "-" line)] deps) (fn [] ~value))])
-                                            [sym value])))))]
+                                        (let [[line col :as loc] (get-loc (meta sym))]
+                                          (cond
+                                            (literal? value) [sym value]
+
+                                            (and (loc->env loc)
+                                                 (not (has-hook-call? value)))
+                                            (let [env (loc->env loc)
+                                                  deps (uix.linter/find-free-variables env value [])]
+                                              [sym (create-cache-lookup (str "l" col ":" line) value deps)])
+
+                                            :else [sym value])))))]
             `(let ~(vec bindings)
-               ~@body))))
+               ~@body))
+
+          :else x))
       fdecl)))
 
 (defn emit-memoized [env args fdecl]
   (if *memo-disabled?*
-    [[] [] fdecl]
+    fdecl
     (do
       (reset! attrs-memo-reg {})
       (reset! elements-memo-reg {})
-      (let [[args dissoc-ks rest-sym] (uix.lib/rest-props args)]
-        (ana/no-warn
-          (ana/analyze* env
-            `(fn ~'uix-memarker [props#]
-               (let [~args [props#]
-                     ~(or rest-sym (gensym "rest-sym")) (dissoc props# ~@dissoc-ks)]
-                 ~@fdecl))
-            nil
-            (when env/*compiler*
-              (:options @env/*compiler*)))))
-      (let [cache-hit (gensym "cache-hit")
-            ns (-> env :ns :name)
-            reg (concat (vals (@attrs-memo-reg ns)) (vals (@elements-memo-reg ns)))
-            cache-binds `[cache# (atom {})
-                          ~cache-hit (fn [args# get-value#]
-                                       (let [deps# args#]
-                                         (or (get (deref cache#) deps#)
-                                             (get (swap! cache# assoc deps# (get-value#)) deps#))))]
-            decls (->> reg
-                       (mapv (fn [{:keys [deps value var-name]}]
-                               `(defn ~var-name ~deps
-                                  (~cache-hit ~(into [(str var-name)] deps) (fn [] ~value))))))
-            body (memo-body fdecl reg cache-hit)]
-        [cache-binds decls body]))))
+      (let [[args dissoc-ks rest-sym] (uix.lib/rest-props args)
+            body-ast (ana/no-warn
+                       (ana/analyze* env
+                                     `(fn ~'uix-memarker [props#]
+                                        (let [~args [props#]
+                                              ~(or rest-sym (gensym "rest-sym")) (dissoc props# ~@dissoc-ks)]
+                                          ~@fdecl))
+                                     nil
+                                     (when env/*compiler*
+                                       (:options @env/*compiler*))))
+            body `(let [~'uix-memarker true
+                        ~ccache (uix.core/-use-cache-internal)]
+                    ~@(memo-body fdecl body-ast))]
+        [body]))))
 
 
 (defmethod compile-attrs :element [_ attrs {:keys [tag-id-class env]}]
@@ -232,15 +248,17 @@
 (declare static-child-element? static-attrs?)
 
 (defn with-memo-element [env el ret]
+  ;; caches $ element
+  ;; ($ :button {:on-click handler} "send") -> (memo ($ :button {:on-click handler} "send") [handler]) <- deps
   (if *memo-disabled?*
     ret
-    (let [var-name (symbol (str "memo-element" "-" (:line env) "-" (:column env)))
+    (let [var-name (symbol (str "e" (:line env) ":" (:column env)))
           ns (-> env :ns :name)]
-      (if-let [{:keys [var-name deps]} (get-in @elements-memo-reg [ns var-name])]
+      (if-let [{:keys [var-name value deps]} (get-in @elements-memo-reg [ns var-name])]
         (do
           (swap! elements-memo-reg update ns dissoc var-name)
-          (if (resolve-var env var-name)
-            `(~var-name ~@deps)
+          (if (get-in env [:locals 'uix-memarker])
+            (create-cache-lookup var-name value deps)
             ret))
         (let [deps-nodes (uix.linter/find-free-variable-nodes env el [])
               deps (->> deps-nodes (map :name) distinct vec)]
