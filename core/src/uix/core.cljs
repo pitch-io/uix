@@ -351,8 +351,11 @@
   (js/Object.defineProperty f "name" #js {:value name}))
 
 (defn -use-cache-internal []
-  (let [cache (use-ref {})]
-    (use-effect-event
-      (fn [deps get-value]
-        (or (get @cache deps)
-            (get (swap! cache assoc deps (get-value)) deps))))))
+  (if uix.compiler.aot/*memo-disabled?*
+    (fn [deps get-value]
+      (get-value))
+    (let [cache (use-ref {})]
+      (use-effect-event
+        (fn [deps get-value]
+          (or (get @cache deps)
+              (get (swap! cache assoc deps (get-value)) deps)))))))
