@@ -7,6 +7,8 @@
             [uix.compiler.attributes :as attrs]
             [uix.lib :refer [doseq-loop]]))
 
+(def ^:dynamic *memo-disabled?* false)
+
 (def react-19+?
   (-> react/version
       (.split ".")
