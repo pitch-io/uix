@@ -408,11 +408,14 @@
         children))))
 
 (defn -use-cache-internal []
-  (if uix.compiler.aot/*memo-disabled?*
+  (let [id #js {:current 0}
+        cache (hooks/use-ref #js {})]
     (fn [deps get-value]
-      (get-value))
-    (let [cache (use-ref {})]
-      (use-effect-event
-        (fn [deps get-value]
-          (or (get @cache deps)
-              (get (swap! cache assoc deps (get-value)) deps)))))))
+      (let [aid (.-current id)
+            did (str ^string aid "-0")
+            vid (str ^string aid "-1")]
+        (set! (.-current id) (inc aid))
+        (when (not= deps (aget (.-current cache) did))
+          (aset (.-current cache) did deps)
+          (aset (.-current cache) vid (get-value)))
+        (aget (.-current cache) vid)))))

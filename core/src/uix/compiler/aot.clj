@@ -92,8 +92,8 @@
 
 (def ccache '-uix-ccahe)
 
-(defn- create-cache-lookup [var-name value deps]
-  `(~ccache ~(into [(str var-name)] deps) (fn [] ~value)))
+(defn- create-cache-lookup [deps value]
+  `(~ccache ~(vec deps) (fn [] ~value)))
 
 (defn with-memo-attrs [env attrs]
   ;; caches element's literal props map
@@ -106,14 +106,14 @@
         (do
           (swap! attrs-memo-reg update ns dissoc var-name)
           (if (get-in env [:locals 'uix-memarker])
-            (create-cache-lookup var-name value deps)
+            (create-cache-lookup deps value)
             attrs))
         (if (seq attrs)
           (let [deps-nodes (uix.linter/find-free-variable-nodes env attrs [])
                 deps (->> deps-nodes (map :name) distinct vec)]
             (swap! attrs-memo-reg assoc-in [ns var-name] {:deps-nodes deps-nodes :deps deps :value attrs :var-name var-name})
             (if (get-in env [:locals 'uix-memarker])
-              (create-cache-lookup var-name attrs deps)
+              (create-cache-lookup deps attrs)
               attrs))
           attrs)))))
 
@@ -159,7 +159,7 @@
                                                  (not (has-hook-call? value)))
                                             (let [env (loc->env loc)
                                                   deps (uix.linter/find-free-variables env value [])]
-                                              [sym (create-cache-lookup (str "l" col ":" line) value deps)])
+                                              [sym (create-cache-lookup deps value)])
 
                                             :else [sym value])))))]
             `(let ~(vec bindings)
@@ -261,7 +261,7 @@
         (do
           (swap! elements-memo-reg update ns dissoc var-name)
           (if (get-in env [:locals 'uix-memarker])
-            (create-cache-lookup var-name value deps)
+            (create-cache-lookup deps value)
             ret))
         (let [deps-nodes (uix.linter/find-free-variable-nodes env el [])
               deps (->> deps-nodes (map :name) distinct vec)]
