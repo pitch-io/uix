@@ -350,15 +350,20 @@
   (set! (.-displayName f) name)
   (js/Object.defineProperty f "name" #js {:value name}))
 
+(def ^:dynamic *-use-cache-internal* true)
+
 (defn -use-cache-internal []
-  (let [id #js {:current 0}
-        cache (hooks/use-ref #js {})]
+  (if *-use-cache-internal*
+    (let [id #js {:current 0}
+          cache (hooks/use-ref #js {})]
+      (fn [deps get-value]
+        (let [aid (.-current id)
+              did (str ^string aid "-0")
+              vid (str ^string aid "-1")]
+          (set! (.-current id) (inc aid))
+          (when (not= deps (aget (.-current cache) did))
+            (aset (.-current cache) did deps)
+            (aset (.-current cache) vid (get-value)))
+          (aget (.-current cache) vid))))
     (fn [deps get-value]
-      (let [aid (.-current id)
-            did (str ^string aid "-0")
-            vid (str ^string aid "-1")]
-        (set! (.-current id) (inc aid))
-        (when (not= deps (aget (.-current cache) did))
-          (aset (.-current cache) did deps)
-          (aset (.-current cache) vid (get-value)))
-        (aget (.-current cache) vid)))))
+      (get-value))))
