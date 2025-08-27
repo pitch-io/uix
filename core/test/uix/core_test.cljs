@@ -163,7 +163,8 @@
 (defui ^{:memo false} comp-props-map [props] 1)
 
 (deftest test-props-map
-  (binding [aot/*memo-disabled?* true]
+  (binding [aot/*memo-disabled?* true
+            uix.core/*-use-cache-internal* false]
     (is (= 1 (comp-props-map #js {:argv nil})))
     (is (= 1 (comp-props-map #js {:argv {}})))
     (is (thrown-with-msg? js/Error #"UIx component expects a map of props, but instead got \[\]" (comp-props-map #js {:argv []})))))
@@ -356,7 +357,8 @@
         (is (= "child2" (aget (.. el -props -children) 0)))))))
 
 (deftest test-rest-props
-  (binding [aot/*memo-disabled?* true]
+  (binding [aot/*memo-disabled?* true
+            uix.core/*-use-cache-internal* false]
     (testing "defui should return rest props"
       (uix.core/defui ^{:memo false} rest-component [{:keys [a b] :& props}]
         [props a b])
@@ -380,7 +382,8 @@
       (is (str/starts-with? (.-name f2) "uix-fn")))))
 
 (deftest test-props-check
-  (binding [aot/*memo-disabled?* true]
+  (binding [aot/*memo-disabled?* true
+            uix.core/*-use-cache-internal* false]
     (s/def ::x string?)
     (s/def ::props (s/keys :req-un [::x]))
     (testing "props check in defui"
@@ -495,7 +498,8 @@
 
 
 (deftest test-hoist-inline
-  (binding [aot/*memo-disabled?* true]
+  (binding [aot/*memo-disabled?* true
+            uix.core/*-use-cache-internal* false]
     (defui ^{:test/inline true :memo false} test-hoist-inline-1 []
       (let [title "hello"
             tag :div
