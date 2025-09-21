@@ -26,7 +26,7 @@
 
 (defn- react-context? [x]
   (identical? (aget x "$$typeof")
-              (js/Symbol.for "react.context")))
+              (.for js/Symbol "react.context")))
 
 
 
