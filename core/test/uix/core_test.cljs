@@ -7,6 +7,7 @@
             ["@testing-library/react" :as rtl]
             [uix.test-utils :as t]
             [uix.compiler.attributes :as attrs]
+            [uix.compiler.aot :as aot]
             [uix.uix :refer [row-compiled]]
             [clojure.string :as str]))
 
@@ -156,14 +157,16 @@
 
 (deftest test-42336
   (is (.-uix-component? ^js comp-42336))
-  (is (= (.-displayName comp-42336) (str `comp-42336))))
+  (is (str/starts-with? (.-displayName comp-42336) "uix.core-test/comp-42336")))
 
-(defui comp-props-map [props] 1)
+(defui ^{:memo false} comp-props-map [props] 1)
 
 (deftest test-props-map
-  (is (= 1 (comp-props-map #js {:argv nil})))
-  (is (= 1 (comp-props-map #js {:argv {}})))
-  (is (thrown-with-msg? js/Error #"UIx component expects a map of props, but instead got \[\]" (comp-props-map #js {:argv []}))))
+  (binding [aot/*memo-disabled?* true
+            uix.core/*-use-cache-internal* false]
+    (is (= 1 (comp-props-map #js {:argv nil})))
+    (is (= 1 (comp-props-map #js {:argv {}})))
+    (is (thrown-with-msg? js/Error #"UIx component expects a map of props, but instead got \[\]" (comp-props-map #js {:argv []})))))
 
 (deftest test-fn
   (let [anon-named-fn (uix.core/fn fn-component [{:keys [x]}] x)
@@ -341,20 +344,22 @@
         (is (= "child2" (aget (.. el -props -children) 0)))))))
 
 (deftest test-rest-props
-  (testing "defui should return rest props"
-    (uix.core/defui rest-component [{:keys [a b] :& props}]
-      [props a b])
-    (is (= [{:c 3} 1 2] (rest-component #js {:argv {:a 1 :b 2 :c 3}})))
-    (is (= [{} 1 2] (rest-component #js {:argv {:a 1 :b 2}}))))
-  (testing "fn should return rest props"
-    (let [f (uix.core/fn rest-component [{:keys [a b] :& props}]
-              [props a b])]
-      (is (= [{:c 3} 1 2] (f #js {:argv {:a 1 :b 2 :c 3}})))
-      (is (= [{} 1 2] (f #js {:argv {:a 1 :b 2}}))))))
+  (binding [aot/*memo-disabled?* true
+            uix.core/*-use-cache-internal* false]
+    (testing "defui should return rest props"
+      (uix.core/defui ^{:memo false} rest-component [{:keys [a b] :& props}]
+        [props a b])
+      (is (= [{:c 3} 1 2] (rest-component #js {:argv {:a 1 :b 2 :c 3}})))
+      (is (= [{} 1 2] (rest-component #js {:argv {:a 1 :b 2}}))))
+    (testing "fn should return rest props"
+      (let [f (uix.core/fn rest-component [{:keys [a b] :& props}]
+                [props a b])]
+        (is (= [{:c 3} 1 2] (f #js {:argv {:a 1 :b 2 :c 3}})))
+        (is (= [{} 1 2] (f #js {:argv {:a 1 :b 2}})))))))
 
 (deftest test-component-fn-name
   (testing "defui name"
-    (defui component-fn-name [])
+    (defui ^{:memo false} component-fn-name [])
     (is (= "uix.core-test/component-fn-name"
            (.-name component-fn-name))))
   (testing "fn name"
@@ -364,34 +369,36 @@
       (is (str/starts-with? (.-name f2) "uix-fn")))))
 
 (deftest test-props-check
-  (s/def ::x string?)
-  (s/def ::props (s/keys :req-un [::x]))
-  (testing "props check in defui"
-    (uix.core/defui props-check-comp
-      [props]
-      {:props [::props]}
-      props)
-    (try
-      (props-check-comp #js {:argv {:x 1}})
-      (catch js/Error e
-        (is (str/starts-with? (ex-message e) "Invalid argument"))))
-    (try
-      (props-check-comp #js {:argv {:x "1"}})
-      (catch js/Error e
-        (is false))))
-  (testing "props check in fn"
-    (let [f (uix.core/fn
-              [props]
-              {:props [::props]}
-              props)]
+  (binding [aot/*memo-disabled?* true
+            uix.core/*-use-cache-internal* false]
+    (s/def ::x string?)
+    (s/def ::props (s/keys :req-un [::x]))
+    (testing "props check in defui"
+      (uix.core/defui ^{:memo false} props-check-comp
+        [props]
+        {:props [::props]}
+        props)
       (try
-        (f #js {:argv {:x 1}})
+        (props-check-comp #js {:argv {:x 1}})
         (catch js/Error e
           (is (str/starts-with? (ex-message e) "Invalid argument"))))
       (try
-        (f #js {:argv {:x "1"}})
+        (props-check-comp #js {:argv {:x "1"}})
         (catch js/Error e
-          (is false))))))
+          (is false))))
+    (testing "props check in fn"
+      (let [f (uix.core/fn
+                [props]
+                {:props [::props]}
+                props)]
+        (try
+          (f #js {:argv {:x 1}})
+          (catch js/Error e
+            (is (str/starts-with? (ex-message e) "Invalid argument"))))
+        (try
+          (f #js {:argv {:x "1"}})
+          (catch js/Error e
+            (is false)))))))
 
 (deftest test-spread-props
   (testing "primitive element"
@@ -467,29 +474,31 @@
 
 
 (deftest test-hoist-inline
-  (defui ^:test/inline test-hoist-inline-1 []
-    (let [title "hello"
-          tag :div
-          props {:title "hello"}]
-      (js->clj
-        #js [($ :div {:title "hello"} ($ :h1 "yo"))
-             ($ :div {:title title} ($ :h1 "yo"))
-             ($ tag {:title "hello"} ($ :h1 "yo"))
-             ($ :div props ($ :h1 "yo"))])))
-  (is (apply = (map #(-> % (assoc "_store" {"validated" 1})
-                           (update "props" dissoc "children"))
-                    (test-hoist-inline-1))))
-  (is (apply = (->> (test-hoist-inline-1)
-                    (mapcat #(let [children (get-in % ["props" "children"])]
-                               (if (or (vector? children) (js/Array.isArray children))
-                                 children
-                                 [children])))
-                    (map #(assoc % "_store" {"validated" 1})))))
+  (binding [aot/*memo-disabled?* true
+            uix.core/*-use-cache-internal* false]
+    (defui ^{:test/inline true :memo false} test-hoist-inline-1 []
+      (let [title "hello"
+            tag :div
+            props {:title "hello"}]
+        (js->clj
+          #js [($ :div {:title "hello"} ($ :h1 "yo"))
+               ($ :div {:title title} ($ :h1 "yo"))
+               ($ tag {:title "hello"} ($ :h1 "yo"))
+               ($ :div props ($ :h1 "yo"))])))
+    (is (apply = (map #(-> % (assoc "_store" {"validated" 1})
+                             (update "props" dissoc "children"))
+                      (test-hoist-inline-1))))
+    (is (apply = (->> (test-hoist-inline-1)
+                      (mapcat #(let [children (get-in % ["props" "children"])]
+                                 (if (or (vector? children) (js/Array.isArray children))
+                                   children
+                                   [children])))
+                      (map #(assoc % "_store" {"validated" 1})))))
 
-  (is (->> (js/Object.keys js/uix.core-test)
-           (filter #(str/starts-with? % "uix_aot_hoisted"))
-           count
-           (= 2))))
+    (is (->> (js/Object.keys js/uix.core-test)
+             (filter #(str/starts-with? % "uix_aot_hoisted"))
+             count
+             (= 2)))))
 
 (deftest test-css-variables
   (testing "should preserve CSS var name"
