@@ -43,7 +43,7 @@
 (defn unescape-text [s]
   (.-textContent (.-documentElement (.parseFromString dom-parser s "text/html"))))
 
-(s/def :link/href string?)
+(s/def :link/href (s/nilable string?))
 
 (s/def ::link
   (s/keys :req-un [:link/href]))
