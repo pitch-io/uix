@@ -12,7 +12,7 @@ _Idiomatic ClojureScript interface to modern React.js_
 [![Clojars Project](https://img.shields.io/clojars/v/com.pitch/uix.core.svg)](https://clojars.org/com.pitch/uix.core)
 [![Clojars Project](https://img.shields.io/clojars/v/com.pitch/uix.dom.svg)](https://clojars.org/com.pitch/uix.dom)
 
-- API compatibility: React v19.0.0
+- API compatibility: React v19.2.0
 - Discuss at [#uix on Clojurians Slack](https://clojurians.slack.com/archives/CNMR41NKB)
 - Try it out in the [playground](https://studio.learn-modern-clojurescript.com/p/default-uix)
 - [A slide deck explaining UIx and migration path from Reagent](https://pitch.com/public/821ed924-6fe6-4ce7-9d75-a63f1ee3c61f)
@@ -23,12 +23,12 @@ _Idiomatic ClojureScript interface to modern React.js_
 ## Installation
 
 ```
-npm install react@19.0.0 react-dom@19.0.0 --save-dev
+npm install react@19.2.0 react-dom@19.2.0 --save-dev
 ```
 
 ```clj
-{:deps {com.pitch/uix.core {:mvn/version "1.4.4"}
-        com.pitch/uix.dom {:mvn/version "1.4.4"}}}
+{:deps {com.pitch/uix.core {:mvn/version "1.4.5"}
+        com.pitch/uix.dom {:mvn/version "1.4.5"}}}
 ```
 
 ### How to start a new project with UIx
