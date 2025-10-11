@@ -207,6 +207,18 @@
       (is (= "<button title=\"hey\">hey</button>"
              (t/as-string ($ as {:title "hey"} "hey")))))))
 
+(deftest test-class-name-attr
+  (let [props {:class "two" :class-name "three" :className "four"}
+        props2 {:class ["two"] :class-name ["three"] :className ["four"]}]
+    (is (= "<a class=\"one two three four\"></a>"
+           (t/as-string ($ :a.one {:class "two" :class-name "three" :className "four"}))))
+    (is (= "<a class=\"one two three four\"></a>"
+           (t/as-string ($ :a.one props))))
+    (is (= "<a class=\"one two three four\"></a>"
+           (t/as-string ($ :a.one {:class ["two"] :class-name ["three"] :className ["four"]}))))
+    (is (= "<a class=\"one two three four\"></a>"
+           (t/as-string ($ :a.one props2))))))
+
 (defonce *error-state (atom nil))
 
 (def error-boundary

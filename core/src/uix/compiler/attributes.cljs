@@ -153,16 +153,20 @@
   "Takes attributes map and parsed tag, and returns attributes merged with class names and id"
   [props id-class]
   (let [props-class (get props :class)
+        props-class-name (get props :class-name)
+        props-className (get props :className)
         id (aget id-class 1)
-        class (aget id-class 2)]
+        class (aget id-class 2)
+        class? (or class props-class props-class-name props-className)]
     (cond-> props
             ;; Only use ID from tag keyword if no :id in props already
       (and (some? id) (nil? (get props :id)))
       (assoc :id id)
 
               ;; Merge classes
-      (or class props-class)
-      (assoc :class (class-names class props-class)))))
+      class?
+      (-> (dissoc :class :class-name :className)
+          (assoc :class (class-names class props-class props-class-name props-className))))))
 
 (defn ^js convert-props
   "Converts `props` Clojure map into JS object suitable for

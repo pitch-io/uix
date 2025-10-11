@@ -25,8 +25,13 @@
   and returns attributes merged with class names and id"
   [props [_ id class]]
   (let [props-class (get props :class)
+        props-class-name (get props :class-name)
+        props-className (get props :className)
+        props-classes (->> [props-class props-class-name props-className]
+                           (filter identity)
+                           (mapcat #(if (vector? %) % [%])))
         id? (and (some? id) (nil? (get props :id)))
-        class? (or class props-class)
+        class? (or class (seq props-classes))
         attrs (into
                (cond-> {}
                         ;; Only use ID from tag keyword if no :id in props already
@@ -36,12 +41,11 @@
                           ;; Merge classes
                  class?
                  (assoc :class (cond
-                                 (vector? props-class) `(class-names ~class ~@props-class)
-                                 props-class `(class-names ~class ~props-class)
+                                 (seq props-classes) `(class-names ~class ~@props-classes)
                                  :else class)))
                (cond-> props
                  id? (dissoc :id)
-                 class? (dissoc :class)))]
+                 class? (dissoc :class :class-name :className)))]
     (when (seq attrs)
       attrs)))
 
