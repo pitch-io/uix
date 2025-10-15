@@ -40,9 +40,6 @@
 (def attrs-memo-reg (atom {}))
 (def elements-memo-reg (atom {}))
 
-(defn- resolve-local [env var-name]
-  (-> env :locals (get var-name)))
-
 (def ^:dynamic *memo-disabled?* false)
 
 (def ccache '-uix-ccahe)
@@ -96,6 +93,7 @@
                             (assoc ret (get-loc node) (:env node-next))
                             ret))
                         {}))]
+    ;; TODO: hoist hooks calls
     (prewalk
       (fn [x]
         (cond
@@ -213,6 +211,7 @@
             ret))
         (let [deps-nodes (uix.linter/find-free-variable-nodes env el [])
               deps (->> deps-nodes (map :name) distinct vec)]
+          (uix.linter/lint-inline-hooks! env el)
           (swap! elements-memo-reg assoc-in [ns var-name] {:deps-nodes deps-nodes :deps deps :value ret :var-name var-name})
           ret)))))
 
