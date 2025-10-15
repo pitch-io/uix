@@ -1,6 +1,7 @@
 (ns uix.compiler.aot
   "Compiler code that translates HyperScript into React calls at compile-time."
-  (:require [cljs.env :as env]
+  (:require [cljs.analyzer :as ana]
+            [cljs.env :as env]
             [clojure.string :as str]
             [uix.compiler.js :as js]
             [uix.compiler.attributes :as attrs]
@@ -36,27 +37,134 @@
   at props position is dynamic (symbol)"
   (fn [tag attrs opts] tag))
 
-(defmethod compile-attrs :element [_ attrs {:keys [tag-id-class]}]
+(def attrs-memo-reg (atom {}))
+(def elements-memo-reg (atom {}))
+
+(def ^:dynamic *memo-disabled?* false)
+
+(def ccache '-uix-ccahe)
+
+(defn- create-cache-lookup [deps value]
+  `(~ccache ~(vec deps) (fn [] ~value)))
+
+(defn with-memo-attrs [env attrs]
+  ;; caches element's literal props map
+  ;; {:title "string" :on-click handler} -> (memo {:title "string" :on-click handler} [handler]) <- deps
+  (if *memo-disabled?*
+    attrs
+    (let [var-name (symbol (str "a" (:line env) ":" (:column env)))
+          ns (-> env :ns :name)]
+      (if-let [{:keys [var-name value deps]} (get-in @attrs-memo-reg [ns var-name])]
+        (do
+          (swap! attrs-memo-reg update ns dissoc var-name)
+          (if (get-in env [:locals 'uix-memarker])
+            (create-cache-lookup deps value)
+            attrs))
+        (if (seq attrs)
+          (let [deps-nodes (uix.linter/find-free-variable-nodes env attrs [])
+                deps (->> deps-nodes (map :name) distinct vec)]
+            (swap! attrs-memo-reg assoc-in [ns var-name] {:deps-nodes deps-nodes :deps deps :value attrs :var-name var-name})
+            (if (get-in env [:locals 'uix-memarker])
+              (create-cache-lookup deps attrs)
+              attrs))
+          attrs)))))
+
+(declare prewalk)
+
+(def literal?
+  (some-fn keyword? number? string? nil? boolean?))
+
+(defn- has-hook-call? [form]
+  (let [yep? (atom false)]
+    (prewalk
+      #(if (uix.linter/hook-call? %)
+         (reset! yep? true)
+         %)
+      form)
+    @yep?))
+
+(defn- memo-body [fdecl ast]
+  (let [get-loc (juxt :line :column)
+        ast-seq (uix.linter/ast->seq ast)
+        loc->env (->> (map vector ast-seq (next ast-seq))
+                      (reduce
+                        (fn [ret [node node-next]]
+                          (if (= :binding (:op node))
+                            (assoc ret (get-loc node) (:env node-next))
+                            ret))
+                        {}))]
+    ;; TODO: hoist hooks calls
+    (prewalk
+      (fn [x]
+        (cond
+          ;; memo let bindings (let [...] ...)
+          ;; TODO: destructuring assignment
+          (and (list? x) (= 'let (first x)) (vector? (second x)))
+          (let [[_ bindings & body] x
+                bindings (->> bindings
+                              (partition-all 2)
+                              (mapcat (fn [[sym value]]
+                                        (let [[line col :as loc] (get-loc (meta sym))]
+                                          (cond
+                                            (literal? value) [sym value]
+
+                                            (and (loc->env loc)
+                                                 (not (has-hook-call? value)))
+                                            (let [env (loc->env loc)
+                                                  deps (uix.linter/find-free-variables env value [])]
+                                              [sym (create-cache-lookup deps value)])
+
+                                            :else [sym value])))))]
+            `(let ~(vec bindings)
+               ~@body))
+
+          :else x))
+      fdecl)))
+
+(defn emit-memoized [env args fdecl]
+  (if *memo-disabled?*
+    fdecl
+    (do
+      (reset! attrs-memo-reg {})
+      (reset! elements-memo-reg {})
+      (let [[args dissoc-ks rest-sym] (uix.lib/rest-props args)
+            body-ast (ana/no-warn
+                       (ana/analyze* env
+                                     `(fn ~'uix-memarker [props#]
+                                        (let [~args [props#]
+                                              ~(or rest-sym (gensym "rest-sym")) (dissoc props# ~@dissoc-ks)]
+                                          ~@fdecl))
+                                     nil
+                                     (when env/*compiler*
+                                       (:options @env/*compiler*))))
+            body `(let [~'uix-memarker true
+                        ~ccache (uix.core/-use-cache-internal)]
+                    ~@(memo-body fdecl body-ast))]
+        [body]))))
+
+
+(defmethod compile-attrs :element [_ attrs {:keys [tag-id-class env]}]
   (if (or (map? attrs) (nil? attrs))
     `(cljs.core/array
-      ~(compile-spread-props :element attrs
-         #(cond-> %
-            ;; merge parsed id and class with attrs map
-            :always (attrs/set-id-class tag-id-class)
-            ;; interpret :style if it's not map literal
-            (and (some? (:style %))
-                 (not (map? (:style %))))
-            (assoc :style `(uix.compiler.attributes/convert-props ~(:style %) (cljs.core/array) true))
-            ;; camel-casify the map
-            :always (attrs/compile-attrs {:custom-element? (last tag-id-class)})
-            ;; emit JS object literal
-            :always js/to-js)))
+      ~(with-memo-attrs env
+         (compile-spread-props :element attrs
+           #(cond-> %
+              ;; merge parsed id and class with attrs map
+              :always (attrs/set-id-class tag-id-class)
+              ;; interpret :style if it's not map literal
+              (and (some? (:style %))
+                   (not (map? (:style %))))
+              (assoc :style `(uix.compiler.attributes/convert-props ~(:style %) (cljs.core/array) true))
+              ;; camel-casify the map
+              :always (attrs/compile-attrs {:custom-element? (last tag-id-class)})
+              ;; emit JS object literal
+              :always js/to-js))))
     ;; otherwise emit interpretation call
     `(uix.compiler.attributes/interpret-attrs ~attrs (cljs.core/array ~@tag-id-class) false)))
 
-(defmethod compile-attrs :component [_ props _]
+(defmethod compile-attrs :component [_ props {:keys [env]}]
   (if (or (map? props) (nil? props))
-    (compile-spread-props :component props (fn [props] `(cljs.core/array ~props)))
+    (with-memo-attrs env (compile-spread-props :component props (fn [props] `(cljs.core/array ~props))))
     `(uix.compiler.attributes/interpret-props ~props)))
 
 (defmethod compile-attrs :fragment [_ attrs _]
@@ -88,25 +196,45 @@
                                "Primitive element: keyword\n"
                                "Component element: symbol"))))
 
+(defn with-memo-element [env el ret]
+  ;; caches $ element
+  ;; ($ :button {:on-click handler} "send") -> (memo ($ :button {:on-click handler} "send") [handler]) <- deps
+  (if *memo-disabled?*
+    ret
+    (let [var-name (symbol (str "e" (:line env) ":" (:column env)))
+          ns (-> env :ns :name)]
+      (if-let [{:keys [var-name value deps]} (get-in @elements-memo-reg [ns var-name])]
+        (do
+          (swap! elements-memo-reg update ns dissoc var-name)
+          (if (get-in env [:locals 'uix-memarker])
+            (create-cache-lookup deps value)
+            ret))
+        (let [deps-nodes (uix.linter/find-free-variable-nodes env el [])
+              deps (->> deps-nodes (map :name) distinct vec)]
+          (uix.linter/lint-inline-hooks! env el)
+          (swap! elements-memo-reg assoc-in [ns var-name] {:deps-nodes deps-nodes :deps deps :value ret :var-name var-name})
+          ret)))))
+
 (defmethod compile-element* :element [v {:keys [env]}]
   (let [[tag attrs & children] (uix.lib/normalize-element env v)
         tag-id-class (attrs/parse-tag tag)
-        attrs-children (compile-attrs :element attrs {:tag-id-class tag-id-class})
+        attrs-children (compile-attrs :element attrs {:tag-id-class tag-id-class :env env})
         tag-str (first tag-id-class)
         ret (if (input-component? tag-str)
               `(create-uix-input ~tag-str ~attrs-children (cljs.core/array ~@children))
               `(>el ~tag-str ~attrs-children (cljs.core/array ~@children)))]
-    ret))
+    (with-memo-element env (into [attrs-children] children) ret)))
 
 (defmethod compile-element* :component [v {:keys [env]}]
   (let [[tag props & children] (uix.lib/normalize-element env v)
         tag (vary-meta tag assoc :tag 'js)
-        props-children (compile-attrs :component props nil)]
-    `(uix.compiler.alpha/component-element ~tag ~props-children (cljs.core/array ~@children))))
+        props-children (compile-attrs :component props {:env env})
+        ret `(uix.compiler.alpha/component-element ~tag ~props-children (cljs.core/array ~@children))]
+    (with-memo-element env (into [tag props-children] children) ret)))
 
-(defmethod compile-element* :fragment [v _]
+(defmethod compile-element* :fragment [v {:keys [env]}]
   (let [[_ attrs & children] v
-        attrs (compile-attrs :fragment attrs nil)
+        attrs (compile-attrs :fragment attrs {:env env})
         ret `(>el fragment ~attrs (cljs.core/array ~@children))]
     ret))
 
@@ -174,6 +302,9 @@
 (defn postwalk [f form]
   (walk (partial postwalk f) f form))
 
+(defn prewalk [f form]
+  (walk (partial prewalk f) identity (f form)))
+
 (defn static-attrs? [attrs]
   (if (:ref attrs)
     false
@@ -193,6 +324,7 @@
 (defn static-child-element? [form]
   (or (string? form)
       (number? form)
+      (nil? form)
       (static-element? form)))
 
 (defn static-element? [form]

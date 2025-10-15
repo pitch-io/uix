@@ -23,7 +23,7 @@ jobs:
 
   build:
     docker:
-      - image: cimg/clojure:1.11-browsers
+      - image: cimg/clojure:1.11.4-openjdk-21.0-browsers
         command: "/bin/bash"
 
     working_directory: ~/repo
