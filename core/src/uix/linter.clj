@@ -75,7 +75,8 @@
     (::hook-in-branch ::hook-in-loop
      ::deps-coll-literal ::literal-value-in-deps
      ::unsafe-set-state ::missing-key
-     ::interop-ref-read ::interop-ref-write)
+     ::interop-ref-read ::interop-ref-write
+     ::memo-compiler-inline-hook)
     (form->loc form)
 
     ::inline-function
@@ -400,7 +401,7 @@
     (filter #(get-in env [:locals % :name]) @syms)))
 
 (defn find-free-variable-nodes [env f deps]
-  (let [ast (ana/analyze env f)
+  (let [ast (ana-api/no-warn (ana/analyze env f))
         deps (set deps)]
     (->> (ast->seq ast)
          (filter #(and (= :local (:op %)) ;; should be a local
@@ -478,6 +479,9 @@
        "Without a vector of dependencies, this can lead to an infinite chain of updates.\n"
        "To fix this, pass the state value into a vector of dependencies of the hook.\n"
        (ppr source)))
+
+(defmethod ana/error-message ::memo-compiler-inline-hook [_ _]
+  (str "Inline hooks in UIx elements are not allowed with auto memoizing compiler enabled. Move hook call into a top level `let` in your component."))
 
 (defn- fn-literal? [form]
   (and (list? form) ('#{fn fn*} (first form))))
@@ -560,7 +564,7 @@
 
 (defn find-missing-and-unnecessary-deps [env f deps]
   (let [free-vars (find-free-variables env f deps)
-        all-unnecessary-deps (set (find-unnecessary-deps env (concat free-vars deps)))
+        all-unnecessary-deps (conj (set (find-unnecessary-deps env (concat free-vars deps))) '-uix-ccahe)
         declared-unnecessary-deps (keep all-unnecessary-deps deps)
         missing-deps (filter (comp not all-unnecessary-deps) free-vars)
         suggested-deps (-> (filter (comp not (set declared-unnecessary-deps)) deps)
@@ -599,6 +603,14 @@
   (binding [*component-context* (atom {:errors []})]
     (run-linters! lint-hook-with-deps form env)
     (report-errors! env)))
+
+(defn lint-inline-hooks! [env el]
+  (clojure.walk/prewalk
+    (fn [x]
+      (when (hook-call? x)
+        (ana/warning ::memo-compiler-inline-hook (find-env-for-form ::memo-compiler-inline-hook x) {}))
+      x)
+    el))
 
 (defn- keys-spec? [spec]
   (contains? #{'cljs.spec.alpha/keys

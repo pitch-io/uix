@@ -15,12 +15,13 @@
 
 (def ^:private goog-debug (with-meta 'goog.DEBUG {:tag 'boolean}))
 
-(defn- no-args-component [sym var-sym body]
-  `(defn ~sym []
-     (let [f# (core/fn [] ~@body)]
-       (if ~goog-debug
-         (binding [*current-component* ~var-sym] (f#))
-         (f#)))))
+(defn- no-args-component [sym var-sym fname body]
+  `(def ~sym
+     (core/fn ~fname [] ;; TODO: in case of memo should be able to refer to memoized component recursively
+       (let [f# (core/fn [] ~@body)]
+         (if ~goog-debug
+           (binding [*current-component* ~var-sym] (f#))
+           (f#))))))
 
 (def props-assert-fn (atom (core/fn [& args] true)))
 
@@ -34,23 +35,24 @@
   (when props-cond
     (swap! env/*compiler* assoc-in [::ana/namespaces ns :uix/specs sym] props-cond)))
 
-(defn- with-args-component [sym var-sym args body props-cond]
+(defn- with-args-component [sym var-sym fname args body props-cond]
   (let [props-sym (gensym "props")
         [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
-    `(defn ~sym [props#]
-       (let [~props-sym (glue-args props#)
-             ~(first args) ~props-sym
-             ~(or rest-sym `_#) (dissoc ~props-sym ~@dissoc-ks)
-             f# (core/fn []
-                  ~(with-props-cond props-cond props-sym)
-                  ~@body)]
-         (if ~goog-debug
-           (binding [*current-component* ~var-sym]
-             (assert (or (map? ~props-sym)
-                         (nil? ~props-sym))
-                     (str "UIx component expects a map of props, but instead got " ~props-sym))
-             (f#))
-           (f#))))))
+    `(def ~sym
+       (core/fn ~fname [props#] ;; TODO: in case of memo should be able to refer to memoized component recursively
+         (let [~props-sym (glue-args props#)
+               ~(first args) ~props-sym
+               ~(or rest-sym `_#) (dissoc ~props-sym ~@dissoc-ks)
+               f# (core/fn []
+                    ~(with-props-cond props-cond props-sym)
+                    ~@body)]
+           (if ~goog-debug
+             (binding [*current-component* ~var-sym]
+               (assert (or (map? ~props-sym)
+                           (nil? ~props-sym))
+                       (str "UIx component expects a map of props, but instead got " ~props-sym))
+               (f#))
+             (f#)))))))
 
 (defn- no-args-fn-component [sym var-sym body]
   `(core/fn ~sym []
@@ -120,8 +122,8 @@
         `(do
            ~@(aot/inline-elements hoisted &env true (:test/inline (meta sym)))
            ~(if (empty? args)
-              (no-args-component memo-fname memo-var-sym body)
-              (with-args-component memo-fname memo-var-sym args body props-cond))
+              (no-args-component memo-fname memo-var-sym fname body)
+              (with-args-component memo-fname memo-var-sym fname args body props-cond))
            (set! (.-uix-component? ~memo-var-sym) true)
            (set-display-name ~memo-var-sym ~(str var-sym))
            ~(uix.dev/fast-refresh-signature memo-var-sym body)

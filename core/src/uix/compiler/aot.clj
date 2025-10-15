@@ -42,51 +42,8 @@
       (number? form)
       (uix.linter/uix-element? form)))
 
-(defmethod compile-attrs :element [_ attrs {:keys [tag-id-class]}]
-  (cond
-    (or (map? attrs) (nil? attrs))
-    `(cljs.core/array
-      ~(compile-spread-props :element attrs tag-id-class
-         #(cond-> %
-            ;; merge parsed id and class with attrs map
-            :always (attrs/set-id-class tag-id-class)
-            ;; interpret :style if it's not map literal
-            (and (some? (:style %))
-                 (not (map? (:style %))))
-            (assoc :style `(uix.compiler.attributes/convert-props ~(:style %) (cljs.core/array) true))
-            ;; camel-casify the map
-            :always (attrs/compile-attrs {:custom-element? (last tag-id-class)})
-            ;; emit JS object literal
-            :always js/to-js)))
-
-    (safe-child? attrs)
-    (if (attrs/id-class? tag-id-class)
-      `(cljs.core/array (uix.compiler.attributes/convert-props {} (cljs.core/array ~@tag-id-class) false) ~attrs)
-      `(cljs.core/array nil ~attrs))
-
-    (and (instance? JSValue attrs) (map? (.-val attrs)))
-    (if (attrs/id-class? tag-id-class)
-      `(cljs.core/array (uix.compiler.attributes/set-id-class ~attrs (cljs.core/array ~@tag-id-class)))
-      `(cljs.core/array ~attrs))
-
-    :else
-    ;; otherwise emit interpretation call
-    `(uix.compiler.attributes/interpret-attrs ~attrs (cljs.core/array ~@tag-id-class) false)))
-
-(defmethod compile-attrs :component [_ props _]
-  (cond
-    (or (map? props) (nil? props))
-    (compile-spread-props :component props nil (fn [props] `(cljs.core/array ~props)))
-
-    (safe-child? props) `(cljs.core/array nil ~props)
-
-    :else))
-
 (def attrs-memo-reg (atom {}))
 (def elements-memo-reg (atom {}))
-
-(defn- resolve-local [env var-name]
-  (-> env :locals (get var-name)))
 
 (def ^:dynamic *memo-disabled?* false)
 
@@ -141,6 +98,7 @@
                             (assoc ret (get-loc node) (:env node-next))
                             ret))
                         {}))]
+    ;; TODO: hoist hooks calls
     (prewalk
       (fn [x]
         (cond
@@ -191,28 +149,45 @@
 
 
 (defmethod compile-attrs :element [_ attrs {:keys [tag-id-class env]}]
-  (if (or (map? attrs) (nil? attrs))
+  (cond
+    (or (map? attrs) (nil? attrs))
     `(cljs.core/array
       ~(with-memo-attrs env
-         (compile-spread-props :element attrs
-           #(cond-> %
-              ;; merge parsed id and class with attrs map
-              :always (attrs/set-id-class tag-id-class)
-              ;; interpret :style if it's not map literal
-              (and (some? (:style %))
-                   (not (map? (:style %))))
-              (assoc :style `(uix.compiler.attributes/convert-props ~(:style %) (cljs.core/array) true))
-              ;; camel-casify the map
-              :always (attrs/compile-attrs {:custom-element? (last tag-id-class)})
-              ;; emit JS object literal
-              :always js/to-js))))
+        (compile-spread-props :element attrs tag-id-class
+         #(cond-> %
+            ;; merge parsed id and class with attrs map
+            :always (attrs/set-id-class tag-id-class)
+            ;; interpret :style if it's not map literal
+            (and (some? (:style %))
+                 (not (map? (:style %))))
+            (assoc :style `(uix.compiler.attributes/convert-props ~(:style %) (cljs.core/array) true))
+            ;; camel-casify the map
+            :always (attrs/compile-attrs {:custom-element? (last tag-id-class)})
+            ;; emit JS object literal
+            :always js/to-js))))
+
+    (safe-child? attrs)
+    (if (attrs/id-class? tag-id-class)
+      `(cljs.core/array (uix.compiler.attributes/convert-props {} (cljs.core/array ~@tag-id-class) false) ~attrs)
+      `(cljs.core/array nil ~attrs))
+
+    (and (instance? JSValue attrs) (map? (.-val attrs)))
+    (if (attrs/id-class? tag-id-class)
+      `(cljs.core/array (uix.compiler.attributes/set-id-class ~attrs (cljs.core/array ~@tag-id-class)))
+      `(cljs.core/array ~attrs))
+
+    :else
     ;; otherwise emit interpretation call
     `(uix.compiler.attributes/interpret-attrs ~attrs (cljs.core/array ~@tag-id-class) false)))
 
 (defmethod compile-attrs :component [_ props {:keys [env]}]
-  (if (or (map? props) (nil? props))
-    (with-memo-attrs env (compile-spread-props :component props (fn [props] `(cljs.core/array ~props))))
-    `(uix.compiler.attributes/interpret-props ~props)))
+  (cond
+    (or (map? props) (nil? props))
+    (with-memo-attrs env (compile-spread-props :component props nil (fn [props] `(cljs.core/array ~props))))
+
+    (safe-child? props) `(cljs.core/array nil ~props)
+
+    :else `(uix.compiler.attributes/interpret-props ~props)))
 
 (defmethod compile-attrs :fragment [_ attrs _]
   (cond
@@ -265,6 +240,7 @@
             ret))
         (let [deps-nodes (uix.linter/find-free-variable-nodes env el [])
               deps (->> deps-nodes (map :name) distinct vec)]
+          (uix.linter/lint-inline-hooks! env el)
           (swap! elements-memo-reg assoc-in [ns var-name] {:deps-nodes deps-nodes :deps deps :value ret :var-name var-name})
           ret)))))
 
