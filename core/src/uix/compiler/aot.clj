@@ -36,8 +36,14 @@
   at props position is dynamic (symbol)"
   (fn [tag attrs opts] tag))
 
+(defn- safe-child? [form]
+  (or (string? form)
+      (number? form)
+      (uix.linter/uix-element? form)))
+
 (defmethod compile-attrs :element [_ attrs {:keys [tag-id-class]}]
-  (if (or (map? attrs) (nil? attrs))
+  (cond
+    (or (map? attrs) (nil? attrs))
     `(cljs.core/array
       ~(compile-spread-props :element attrs
          #(cond-> %
@@ -51,17 +57,31 @@
             :always (attrs/compile-attrs {:custom-element? (last tag-id-class)})
             ;; emit JS object literal
             :always js/to-js)))
+
+    (safe-child? attrs) `(cljs.core/array nil ~attrs)
+
+    :else
     ;; otherwise emit interpretation call
     `(uix.compiler.attributes/interpret-attrs ~attrs (cljs.core/array ~@tag-id-class) false)))
 
 (defmethod compile-attrs :component [_ props _]
-  (if (or (map? props) (nil? props))
+  (cond
+    (or (map? props) (nil? props))
     (compile-spread-props :component props (fn [props] `(cljs.core/array ~props)))
+
+    (safe-child? props) `(cljs.core/array nil ~props)
+
+    :else
     `(uix.compiler.attributes/interpret-props ~props)))
 
 (defmethod compile-attrs :fragment [_ attrs _]
-  (if (map? attrs)
+  (cond
+    (map? attrs)
     `(cljs.core/array ~(-> attrs attrs/compile-attrs js/to-js))
+
+    (safe-child? attrs) `(cljs.core/array nil ~attrs)
+
+    :else
     `(uix.compiler.attributes/interpret-attrs ~attrs (cljs.core/array) false)))
 
 (defn- input-component? [x]
