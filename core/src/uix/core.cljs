@@ -2,8 +2,7 @@
   "Public API"
   (:refer-clojure :exclude [use])
   (:require-macros [uix.core])
-  (:require [goog.object :as gobj]
-            [react]
+  (:require [react]
             [uix.hooks.alpha :as hooks]
             [uix.compiler.aot]
             [uix.lib :refer [doseq-loop map->js]]
@@ -42,9 +41,9 @@
                         (when getInitialState
                           (set! (.-state this) (getInitialState this)))
                         this))]
-    (gobj/extend (.-prototype ctor) (.-prototype react/Component) methods)
+    (js/Object.assign (.-prototype ctor) (.-prototype react/Component) methods)
     (when render (set! (.-render ^js (.-prototype ctor)) render))
-    (gobj/extend ctor react/Component static-methods)
+    (js/Object.assign ctor react/Component static-methods)
     (when displayName
       (set! (.-displayName ctor) displayName)
       (set! (.-cljs$lang$ctorStr ctor) displayName)

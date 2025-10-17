@@ -1,6 +1,5 @@
 (ns uix.lib
   #?(:cljs (:require-macros [uix.lib :refer [doseq-loop]]))
-  #?(:cljs (:require [goog.object :as gobj]))
   #?(:clj (:require [cljs.analyzer :as ana]
                     [clojure.walk]
                     [cljs.core])))
@@ -24,7 +23,7 @@
 #?(:cljs
    (defn map->js [m]
      (reduce-kv (fn [o k v]
-                  (gobj/set o (name k) v)
+                  (unchecked-set o (name k) v)
                   o)
                 #js {}
                 m)))

@@ -14,7 +14,7 @@
 
 (def ^:dynamic *use-reagent-input-enabled?* nil)
 
-(defn should-use-reagent-input? []
+(defn ^boolean should-use-reagent-input? []
   (if (boolean? *use-reagent-input-enabled?*)
     *use-reagent-input-enabled?*
     (and (exists? js/reagent.impl.util.*non-reactive*)

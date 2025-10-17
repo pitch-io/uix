@@ -1,6 +1,5 @@
 (ns uix.compiler.attributes
-  (:require [clojure.string :as str]
-            [goog.object :as gobj]))
+  (:require [clojure.string :as str]))
 
 (declare convert-prop-value)
 (declare convert-prop-value-shallow)
@@ -67,15 +66,15 @@
     :else v))
 
 (defn kv-conv [o k v]
-  (gobj/set o (cached-prop-name k) (convert-prop-value v))
+  (unchecked-set o (cached-prop-name k) (convert-prop-value v))
   o)
 
 (defn kv-conv-shallow [o k v]
-  (gobj/set o (cached-prop-name k) (convert-interop-prop-value k v))
+  (unchecked-set o (cached-prop-name k) (convert-interop-prop-value k v))
   o)
 
 (defn custom-kv-conv [o k v]
-  (gobj/set o (cached-custom-prop-name k) (convert-prop-value v))
+  (unchecked-set o (cached-custom-prop-name k) (convert-prop-value v))
   o)
 
 (defn convert-prop-value [x]

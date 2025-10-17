@@ -1,13 +1,12 @@
 (ns uix.compiler.alpha
   (:require [react]
-            [goog.object :as gobj]
             [uix.compiler.attributes :as attrs]
             [clojure.string :as str]))
 
 (defn- reagent-component? [^js component-type]
   (->> (.keys js/Object component-type)
        (some #(when (str/starts-with? % "G_")
-                (identical? component-type (gobj/get component-type %))))))
+                (identical? component-type (unchecked-get component-type %))))))
 
 (defn validate-component [^js component-type]
   (when (and (not (.-uix-component? component-type))
@@ -34,7 +33,7 @@
   (and (not (.hasOwnProperty x "$$typeof"))
        (some-> x .-constructor (identical? js/Object))))
 
-(defn- js-props? [tag props]
+(defn- ^boolean js-props? [tag props]
   (and (or (string? tag) (not (.-uix-component? ^js tag)))
        props (pojo? props)))
 
