@@ -37,14 +37,16 @@
   (and (or (string? tag) (not (.-uix-component? ^js tag)))
        props (pojo? props)))
 
-(defn create-element [args children]
+(def create-element* react/createElement)
+
+(defn ^js create-element [args children]
   (let [tag (aget args 0)
         props (aget args 1)
         child (aget args 2)]
     (if (js-props? tag child)
       ;; merge dynamic js props onto static ones
-      (.apply react/createElement nil (.concat #js [tag (js/Object.assign props child)] children))
-      (.apply react/createElement nil (.concat args children)))))
+      (js* "~{}(~{}, ~{}, ...~{})" react/createElement tag (js/Object.assign props child) children)
+      (js* "~{}(...~{}, ...~{})" react/createElement args children))))
 
 (defn- uix-component-element [component-type ^js props-children children]
   (let [props (aget props-children 0)
