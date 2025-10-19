@@ -58,8 +58,15 @@
             ;; emit JS object literal
             :always js/to-js)))
 
-    (safe-child? attrs) `(cljs.core/array nil ~attrs)
-    (and (instance? JSValue attrs) (map? (.-val attrs))) `(cljs.core/array ~attrs)
+    (safe-child? attrs)
+    (if (attrs/id-class? tag-id-class)
+      `(cljs.core/array (uix.compiler.attributes/convert-props {} (cljs.core/array ~@tag-id-class) false) ~attrs)
+      `(cljs.core/array nil ~attrs))
+
+    (and (instance? JSValue attrs) (map? (.-val attrs)))
+    (if (attrs/id-class? tag-id-class)
+      `(cljs.core/array (uix.compiler.attributes/set-id-class ~attrs (cljs.core/array ~@tag-id-class)))
+      `(cljs.core/array ~attrs))
 
     :else
     ;; otherwise emit interpretation call

@@ -117,9 +117,9 @@
 
 (defn use-deferred-value
   ([v]
-   (r/useDeferredValue v))
+   (r/useDeferredValue (use-clj-deps v)))
   ([v initial]
-   (r/useDeferredValue v initial)))
+   (r/useDeferredValue (use-clj-deps v) initial)))
 
 (defn use-transition []
   (r/useTransition))
