@@ -39,7 +39,7 @@
         [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
     `(defn ~sym [props#]
        (let [~props-sym (glue-args props#)
-             ~args (cljs.core/array ~props-sym)
+             ~(first args) ~props-sym
              ~(or rest-sym `_#) (dissoc ~props-sym ~@dissoc-ks)
              f# (core/fn []
                   ~(with-props-cond props-cond props-sym)
