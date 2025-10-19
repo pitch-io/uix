@@ -39,7 +39,7 @@
   (with-redefs [uix.lib/cljs-env? (fn [_] true)
                 ana/resolve-var (fn [_ _] nil)]
     (is (= (aot/compile-element [:h1] nil)
-           '(uix.compiler.aot/>el "h1" (cljs.core/array nil) (cljs.core/array))))
+           '(js* "~{}(~{}, ...~{}, ...~{})" uix.compiler.alpha/create-element* "h1" (cljs.core/array nil) (cljs.core/array))))
     (is (= (aot/compile-element '[x {} 1 2] nil)
            '(uix.compiler.alpha/component-element x (cljs.core/array {}) (cljs.core/array 1 2))))
     (is (= (aot/compile-element '[x {:x 1 :ref 2} 1 2] nil)

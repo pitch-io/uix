@@ -59,6 +59,7 @@
             :always js/to-js)))
 
     (safe-child? attrs) `(cljs.core/array nil ~attrs)
+    (and (instance? JSValue attrs) (map? (.-val attrs))) `(cljs.core/array ~attrs)
 
     :else
     ;; otherwise emit interpretation call
@@ -108,14 +109,26 @@
                                "Primitive element: keyword\n"
                                "Component element: symbol"))))
 
+(declare static-child-element? static-attrs?)
+
 (defmethod compile-element* :element [v {:keys [env]}]
   (let [[tag attrs & children] (uix.lib/normalize-element env v)
         tag-id-class (attrs/parse-tag tag)
         attrs-children (compile-attrs :element attrs {:tag-id-class tag-id-class})
         tag-str (first tag-id-class)
-        ret (if (input-component? tag-str)
+        ret (cond
+              (input-component? tag-str)
               `(create-uix-input ~tag-str ~attrs-children (cljs.core/array ~@children))
-              `(>el ~tag-str ~attrs-children (cljs.core/array ~@children)))]
+
+              (and (static-child-element? attrs) (every? static-child-element? children))
+              (vary-meta `(~'js* "~{}(~{}, ...~{}, ...~{})" uix.compiler.alpha/create-element* ~tag-str ~attrs-children (cljs.core/array ~@children))
+                         assoc :tag 'js)
+
+              (and (static-attrs? attrs) (every? static-child-element? children))
+              (vary-meta `(~'js* "~{}(~{}, ...~{}, ...~{})" uix.compiler.alpha/create-element* ~tag-str ~attrs-children (cljs.core/array ~@children))
+                         assoc :tag 'js)
+
+              :else `(>el ~tag-str ~attrs-children (cljs.core/array ~@children)))]
     ret))
 
 (defmethod compile-element* :component [v {:keys [env]}]
@@ -186,7 +199,7 @@
     (coll? form)
     (outer (maybe-with-meta form (into (empty form) (map inner form))))
 
-    (= (type form) JSValue)
+    (instance? JSValue form)
     (outer (JSValue. (inner (.-val form))))
 
     :else (outer form)))
@@ -200,13 +213,14 @@
     (let [static-attrs? (atom true)]
       (postwalk
         (fn [form]
-          (when (or (symbol? form)
-                    (list? form)
-                    (instance? clojure.lang.Cons form))
-            (reset! static-attrs? false))
-          form)
+          (if (or (symbol? form)
+                  (list? form)
+                  (instance? clojure.lang.Cons form))
+            (reset! static-attrs? false)
+            form))
         attrs)
       @static-attrs?)))
+
 (declare static-element?)
 
 
