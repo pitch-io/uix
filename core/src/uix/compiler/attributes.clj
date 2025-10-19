@@ -20,6 +20,9 @@
                        (str/replace class-name #"\." " "))]
       (list tag id class-name (some? (re-find #"-" tag))))))
 
+(defn id-class? [[_ id class]]
+  (or (some? id) (some? class)))
+
 (defn set-id-class
   "Takes attributes map and parsed tag triplet,
   and returns attributes merged with class names and id"

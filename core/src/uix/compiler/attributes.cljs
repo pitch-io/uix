@@ -148,7 +148,7 @@
                        (str/replace class-name #"\." " "))]
       #js [tag id class-name (some? (re-find #"-" tag))])))
 
-(defn- set-id-class
+(defn set-id-class
   "Takes attributes map and parsed tag, and returns attributes merged with class names and id"
   [props id-class]
   (let [props-class (get props :class)
