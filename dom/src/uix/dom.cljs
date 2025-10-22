@@ -146,3 +146,46 @@
                                :crossOrigin cross-origin
                                :integrity integrity
                                :nonce nonce}))
+
+;; dev time helpers
+
+(def log-box
+  (uix.core/create-error-boundary
+    {:derive-error-state (fn [error] {:error error})
+     :did-catch (fn [error info]
+                  (this-as this
+                    (.setState this {:error error :info info})))}
+    (fn [[{:keys [error info loc] :as state} set-state] {:keys [children]}]
+      (if state
+        (when info
+          (let [stack (-> (.-componentStack info)
+                          (.split "\n")
+                          (.slice 1 -1))]
+            (uix.core/$ :div {:style {:background "#fff"
+                                      :color "#454545"
+                                      :border "6px solid #ffcdc1"
+                                      :padding 16
+                                      :z-index 9999
+                                      :position :fixed
+                                      :left 0
+                                      :top 0
+                                      :width "100vw"
+                                      :height "100vh"
+                                      :overflow :auto}}
+              (uix.core/$ :div {:style {:font-size 26
+                                        :color "#cd3f1c"}}
+                 (.-message error))
+              (uix.core/$ :div {:style {:font-size 15}}
+                (uix.core/$ :pre {:style {:margin "32px 0"}
+                                  :dangerouslySetInnerHTML {:__html (str "Component Stack:\n"
+                                                                         (-> stack
+                                                                             (.join "\n")))}})
+                (uix.core/$ :pre {:style {:margin "0 0 32px"}
+                                  :dangerouslySetInnerHTML {:__html (str "Call Stack:\n"
+                                                                         (-> (.-stack error)
+                                                                             (.split "\n")
+                                                                             (.slice 1)
+                                                                             (.join "\n")))}})
+                (uix.core/$ :div {:style {:font-size 13}}
+                  "This screen is visible only in development. It will not appear if the app crashes in production. Open your browser's developer console to further inspect this error.")))))
+        children))))
