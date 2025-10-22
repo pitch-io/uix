@@ -287,16 +287,18 @@
     :or   {display-name (str (gensym "uix.error-boundary"))}}
    render-fn]
   (let [constructor  (fn [^js/React.Component this _]
-                       (set! (.-state this) #js {:argv nil}))
+                       (let [setState (.bind (.-setState this) this)
+                             set-state (fn [new-value]
+                                         (setState #js {:argv new-value}))]
+                         (set! (.-setState this) set-state)
+                         (set! (.-state this) #js {:argv nil})))
         derive-state (fn [error]
                        #js {:argv (derive-error-state error)})
         render       (fn []
                        (this-as ^react/Component this
                                 (let [props     (.-props this)
-                                      state     (.-state this)
-                                      set-state (fn [new-value]
-                                                  (.setState this #js {:argv new-value}))]
-                                  (render-fn [(.-argv state) set-state]
+                                      state     (.-state this)]
+                                  (render-fn [(.-argv state) (.-setState this)]
                                              (glue-args props)))))
         class        (create-class {:constructor              constructor
                                     :displayName              display-name
