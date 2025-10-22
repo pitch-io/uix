@@ -67,9 +67,8 @@
     @reaction
     ;; otherwise manage subscription via hooks
     (let [subscribe (use-batched-subscribe reaction)
-          get-snapshot (uix/use-callback #(run-reaction reaction) [reaction])
-          value (use-sync-external-store subscribe get-snapshot)]
-      (uix/use-deferred-value value))))
+          get-snapshot (uix/use-callback #(run-reaction reaction) [reaction])]
+      (use-sync-external-store subscribe get-snapshot))))
 
 (defn use-subscribe
   "Takes re-frame subscription query e.g. [:current-document/title],
