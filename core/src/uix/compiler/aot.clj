@@ -16,16 +16,16 @@
       (vector? spread-props) spread-props
       :else nil)))
 
-(defmulti compile-spread-props (fn [tag attrs f] tag))
+(defmulti compile-spread-props (fn [tag attrs tag-id-class f] tag))
 
-(defmethod compile-spread-props :element [_ attrs f]
+(defmethod compile-spread-props :element [_ attrs tag-id-class f]
   (if-let [spread-props (props->spread-props attrs)]
-    `(~'js/Object.assign ~(f (dissoc attrs :&))
-       ~@(for [props spread-props]
-           `(uix.compiler.attributes/convert-props ~props (cljs.core/array) false)))
+    `(merge-props ~(nth tag-id-class 2 nil)
+       (cljs.core/array ~(f (dissoc attrs :&)) ~@(for [props spread-props]
+                                                   `(uix.compiler.attributes/convert-props ~props (cljs.core/array) false))))
     (f attrs)))
 
-(defmethod compile-spread-props :component [_ props f]
+(defmethod compile-spread-props :component [_ props _ f]
   (if-let [spread-props (props->spread-props props)]
     (f `(merge ~(dissoc props :&) ~@spread-props))
     (f props)))
@@ -45,7 +45,7 @@
   (cond
     (or (map? attrs) (nil? attrs))
     `(cljs.core/array
-      ~(compile-spread-props :element attrs
+      ~(compile-spread-props :element attrs tag-id-class
          #(cond-> %
             ;; merge parsed id and class with attrs map
             :always (attrs/set-id-class tag-id-class)
@@ -75,7 +75,7 @@
 (defmethod compile-attrs :component [_ props _]
   (cond
     (or (map? props) (nil? props))
-    (compile-spread-props :component props (fn [props] `(cljs.core/array ~props)))
+    (compile-spread-props :component props nil (fn [props] `(cljs.core/array ~props)))
 
     (safe-child? props) `(cljs.core/array nil ~props)
 
