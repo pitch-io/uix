@@ -413,7 +413,12 @@
         (is (= "div" (.-type el)))
         (is (= prn (.. el -props -onClick)))
         (is (= 100 (.. el -props -width)))
-        (is (= "blue" (.. el -props -style -color)))))
+        (is (= "blue" (.. el -props -style -color))))
+      (testing "class names merging"
+        (let [props1 {:class "ok"}
+              props2 {:class "world"}
+              el (uix.core/$ :div.hello {:title "x" :& [props1 props2]})]
+          (is (= "hello world" (.. el -props -className))))))
     (testing "dynamic"
       (let [tag :div
             props {:width 100 :style {:color :blue}}
@@ -421,7 +426,13 @@
         (is (= "div" (.-type el)))
         (is (= prn (.. el -props -onClick)))
         (is (= 100 (.. el -props -width)))
-        (is (= "blue" (.. el -props -style -color))))))
+        (is (= "blue" (.. el -props -style -color))))
+      (testing "class names merging"
+        (let [tag :div.hello
+              props1 {:class "ok"}
+              props2 {:class "world"}
+              el (uix.core/$ tag {:title "x" :& [props1 props2]})]
+          (is (= "hello world" (.. el -props -className)))))))
   (testing "component element"
     (testing "static"
       (defui spread-props-comp [])

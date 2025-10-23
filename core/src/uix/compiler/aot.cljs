@@ -4,7 +4,7 @@
             [react :as react]
             [uix.compiler.input]
             [uix.compiler.alpha :as uixc]
-            [uix.compiler.attributes]
+            [uix.compiler.attributes :as attrs]
             [uix.lib :refer [doseq-loop]]))
 
 (def react-19+?
@@ -48,3 +48,6 @@
     (>el tag attrs-children children)))
 
 (def fragment react/Fragment)
+
+(defn merge-props [static-class props]
+  (js* "Object.assign(...~{}, ~{})" props #js {:className (attrs/class-names static-class (.-className (aget props (dec (.-length props)))))}))
