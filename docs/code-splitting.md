@@ -39,9 +39,9 @@ For the above to compile correctly you'd have to update build config in `shadow-
 
 ```clojure
 {:module-loader true
- :modules {:main {:entries [app.core}}
-           :ui-lib {:entries [app.ui.lib}
-                    :depends-on #{:main}}}
+ :modules {:main {:entries [app.core]}
+           :ui-lib {:entries [app.ui.lib]
+                    :depends-on #{:main}}}}
 
 ```
 

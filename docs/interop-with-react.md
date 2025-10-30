@@ -1,5 +1,14 @@
 # Interop with React
 
+Use this guide when you want to mix UIx with the broader React ecosystem: import JS components, pass props between worlds, and forward refs when a third‑party library requires it.
+
+> TL;DR
+>
+> - Use `($ SomeJsComponent {:some-prop 1})` directly — UIx will camelCase keys and convert the top‑level props map for you.
+> - When a JS component expects nested objects/arrays, pass them explicitly (use JS objects or `#js []`). Top level `:style` and keyword values are converted for you.
+> - To expose a UIx component to JS/React, wrap it with `uix.core/as-react`.
+> - For libraries that inject refs via render props, use `uix.core/forward-ref`.
+
 ## Using React components in UIx
 
 In the [“Elements”](/docs/elements.md) section it was briefly mentioned that React components written in JavaScript can be used in the `$` macro, but with a difference in how props are passed into such a component.
@@ -121,7 +130,7 @@ After cleaning things a bit, the final code looks much better:
 
 [_Not relevant for React v19 or later_](https://react.dev/reference/react/forwardRef)
 
-Some third party React components can inject a `ref` into a child element,
+Some third-party React components can inject a `ref` into a child element,
 which requires doing [ref forwarding](https://react.dev/reference/react/forwardRef). It's not needed when passing refs between
 UIx elements, but is still required for a case when non-UIx component injects a
 ref into UIx element.
@@ -136,11 +145,11 @@ For this specific case there's `uix.core/forward-ref`, which should be used excl
   ...)
 
 (def button-forwarded
-  (uix/forward-ref button))
+  (uix.core/forward-ref button))
 
 ($ Menu
   ($ button-forwarded {:on-click handle-click}
-    "press me))
+    "press me"))
 ```
 
 ## Error boundaries

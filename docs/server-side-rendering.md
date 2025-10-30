@@ -5,7 +5,9 @@
 - [Hooks](#hooks)
 - [Cross-platform `uix.core` API](#cross-platform-uixcore-api)
 
-`uix.dom.server` namespace implements React's server-side rendering in Clojure enabling UIx components serialization to HTML on JVM.
+`uix.dom.server` implements React's server-side rendering (SSR) on the JVM, so you can serialize UIx components to HTML and optionally hydrate them on the client.
+
+> When to use SSR: faster first paint, better SEO, and the ability to stream HTML before JS loads. Hydration turns the static HTML into interactive UI on the client.
 
 ```clojure
 (ns my.app
@@ -25,7 +27,12 @@
 Similar to `react-dom/server` API there are two functions to render UIx components to HTML string and their streaming counterparts:
 
 - `uix.dom.server/render-to-static-markup` and `uix.dom.server/render-to-static-stream` — generates HTML string, can be used for templating
-- `uix.dom.server/render-to-string` and `uix.dom.server/render-to-stream` — generates HTML string that will be hydarated by React on the front-end, when HTML document is loaded
+- `uix.dom.server/render-to-string` and `uix.dom.server/render-to-stream` — generates HTML string that will be hydrated by React on the front-end, when HTML document is loaded
+
+When to choose which:
+
+- Use `render-to-static-markup`/`render-to-static-stream` for HTML that will never hydrate (emails, CMS pages, simple templates).
+- Use `render-to-string`/`render-to-stream` when the client will hydrate into a live React app.
 
 You can read more about these [here](https://react.dev/reference/react-dom/server).
 
@@ -77,3 +84,11 @@ This repo is setup for everything you'll need, and since it's a template repo yo
 ## Hooks
 
 Only a subset of Hooks runs when server rendering. Read [React docs](https://react.dev/) to understand how hooks work when server rendering.
+
+---
+
+## Common pitfalls
+
+- Browser‑only APIs on the server — guard with reader conditionals (`#?(:cljs ...)`).
+- Mismatched markup between server and client — ensure props/locale/random values are consistent across environments.
+- Long‑running effects in SSR — effects don’t run during SSR; move data fetching outside render or use loaders on the server.

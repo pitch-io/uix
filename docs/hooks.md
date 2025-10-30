@@ -1,6 +1,18 @@
 # Hooks
 
-UIx wraps existing React hooks to smooth over some rough spots and provide a more idiomatic interface for Clojure. `uix.core` exposes only the default React hooks, named equivalently to the JS versions except in kebab-case, e.g. `useEffect` becomes `use-effect`.
+Hooks are how you add state, effects, refs, and memoization to function components. UIx mirrors React’s hooks API but smooths over JS/CLJ differences so you can write idiomatic Clojure.
+
+> Why UIx hooks: deps as vectors, structural equality for deps, atom‑like refs, and compile‑time linting. See also [Code linting](./code-linting.md).
+
+`uix.core` exposes the default React hooks in kebab‑case (e.g., `useEffect` → `use-effect`).
+
+## Choosing the right hook
+
+- `use-state` — local component state; returns `[value set!]` where `set!` accepts a value or an updater fn.
+- `use-effect` / `use-layout-effect` — side effects; cleanup by returning a function.
+- `use-memo` — cache expensive computations based on deps.
+- `use-callback` — stable function identity based on deps.
+- `use-ref` — mutable box with atom‑like API; doesn’t trigger renders.
 
 There are multiple differences from pure React though.
 

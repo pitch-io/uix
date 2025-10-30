@@ -1,6 +1,29 @@
 # Elements
 
-UIx is using `$` to create elements that describe UI structure. There are 3 main types of elements: DOM elements, UIx component instances, and interop elements.
+UIx uses the `$` macro to create elements (no JSX required). You’ll use it for three things: DOM nodes, UIx components, and JS React components.
+
+> Who is this for: Anyone writing UI with UIx. If you know `React.createElement`, `$` is the same idea with nicer syntax.
+>
+> Related: [Components](./components.md), [Interop with React](./interop-with-react.md), [DOM attributes](./components.md#dom-attributes), [:ref](./components.md#ref-attribute)
+
+## At a glance
+
+```clojure
+;; DOM element
+($ :button#save.btn.primary {:disabled false} "Save")
+
+;; UIx component instance
+($ my-button {:on-click f} "Save")
+
+;; JS React component instance
+($ Button {:on-click f} "Save")
+```
+
+The first argument can be:
+
+- A keyword DOM tag (supports `#id` and `.class` shorthand)
+- A UIx component var (from `defui` or `uix.core/fn`)
+- A JS React component (function or class)
 
 ## DOM elements
 
@@ -33,9 +56,14 @@ Component instances are also created via the `$` macro call, where the first arg
 
 ## React component instances
 
-React components written in JavaScript can be used directly in UIx with a minor differences in how props are passed into a component. See more detalis on the [“Interop with React”](/docs/interop-with-react.md) page.
+React components written in JavaScript can be used directly in UIx with minor differences in how props are passed into a component. See more details on the [“Interop with React”](./interop-with-react.md) page.
 
 ```clojure
 ($ Button {:on-click #(js/console.log :click)}
   "press me")
 ```
+
+When passing props:
+
+- Use CLJ maps for props. For JS components, UIx converts them for you.
+- Spread additional props with `:&` when you need to combine maps or include JS objects. See [props spread](./components.md#props-transferring-via-rest-and-spread-syntax).

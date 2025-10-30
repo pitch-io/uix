@@ -1,15 +1,21 @@
 # State
 
+Local component state in UIx is powered by React’s `useState`, with a Clojure‑friendly API.
+
+> Mental model: Treat state as immutable values updated through a single setter function. Prefer deriving UI from props and state.
+>
+> Related: [Hooks](./hooks.md), [Effects](./effects.md)
+
 UIx is using [React's state hook](https://reactjs.org/docs/hooks-state.html#hooks-and-function-components) for local state.
 
 ```clojure
 (defui form []
   (let [[value set-value!] (uix.core/use-state "")]
     ($ :input {:value value
-               :on-change #(set-value! value (.. % -target -value))})))
+               :on-change #(set-value! (.. % -target -value))})))
 ```
 
-In some React wrappers state is represented using the `Atom` datatype that has has `reset!` and `swap!` operations. We take a similar naming approach and suffix state updating function with a bang `!` denoting that the operation is mutating a value.
+In some React wrappers state is represented using the `Atom` datatype that has `reset!` and `swap!` operations. We take a similar naming approach and suffix state updating function with a bang `!` denoting that the operation is mutating a value.
 
 > Similar to `clojure.core/swap!`, `set-value!` from the above example also takes a function that will receive the current value and arbitrary number of additional arguments, and return the next value of component's state.
 

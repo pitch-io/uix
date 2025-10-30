@@ -1,5 +1,13 @@
 # Migrating from Reagent
 
+This guide maps common Reagent patterns to their UIx equivalents and offers a pragmatic path to migrate incrementally.
+
+> Who is this for: Teams with existing Reagent code who want modern React features, better interop, or to align with the React mental model.
+>
+> Strategy: Start at the edges — new components in UIx, keep the rest in Reagent, and interop where needed. Convert shared patterns (state, effects) next; finish with leaf components.
+
+If you’re new to React’s model, skim [What is UIx?](./what-is-uix.md) and React’s [Render and commit](https://react.dev/learn/render-and-commit). Also see [this slide deck](https://pitch.com/public/821ed924-6fe6-4ce7-9d75-a63f1ee3c61f).
+
 This document describes how to migrate Reagent components to UIx, including syntactical differences and how various patterns in Reagent translate to UIx. UIx doesn't provide any abstractions on top of React, thus it is recommended to make yourself familiar with React in general. Also make sure to check out [this slide deck](https://pitch.com/public/821ed924-6fe6-4ce7-9d75-a63f1ee3c61f).
 
 ## Element syntax

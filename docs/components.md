@@ -1,5 +1,31 @@
 # Components
 
+Build function components with `defui` and return elements with `$`. If you’ve used React function components without JSX, this will feel familiar.
+
+> Who is this for: React or Reagent users who want the minimal mental model to build UI with UIx.
+>
+> Prerequisites: Skim [Elements](./elements.md) first for how `$` works.
+>
+> Related: [Hooks](./hooks.md), [State](./state.md), [Effects](./effects.md), [Interop with React](./interop-with-react.md)
+
+## At a glance
+
+```clojure
+(ns my.app
+  (:require [uix.core :refer [defui $]]))
+
+(defui button [{:keys [on-click children]}]
+  ($ :button.btn {:on-click on-click} children))
+
+(defui app []
+  ($ :div
+    ($ button {:on-click #(js/console.log :minus)} "-")
+    ($ :span "0")
+    ($ button {:on-click #(js/console.log :plus)} "+")))
+```
+
+The `$` macro is similar to `React.createElement`, with a shorthand for `id`/`class` in tag names.
+
 UIx components are defined using the `defui` macro, which returns React elements created using the `$` macro. The signature of `$` macro is similar to `React.createElement`, with an additional shorthand syntax in the tag name to declare CSS id and class names (similar to Hiccup):
 
 ```js
@@ -28,16 +54,16 @@ React.createElement("div", { onClick: f }, child1, child2);
 (defui sign-in-form [{:keys [email password]}]
   ($ :form
     ($ text-input {:value email :type :email})
-    ($ text-input {:value password :type password})
+    ($ text-input {:value password :type :password})
     ($ button {} "Sign in")))
 ```
 
 ## Inline components
 
-Sometimes you might want to create an inline component using anonymous function. Let's take a look at the following example:
+Sometimes you might want to create an inline component using an anonymous function. Let's take a look at the following example:
 
 ```clojure
-(defui ui-list [{{:keys [key-fn data item]}}]
+(defui ui-list [{:keys [key-fn data item]}]
   ($ :div
     (for [x data]
       ($ item {:data x :key (key-fn x)}))))
@@ -45,7 +71,7 @@ Sometimes you might want to create an inline component using anonymous function.
 (defui list-item [{:keys [data]}]
   ($ :div (:id data)))
 
-($ ul-list
+($ ui-list
   {:key-fn :id
    :data [{:id 1} {:id 2} {:id 3}]
    :item list-item})
@@ -56,12 +82,12 @@ In the example above `ul-list` takes `item` props which has to be a `defui` comp
 With `uix.core/fn` it becomes less annoying:
 
 ```clojure
-(defui ui-list [{{:keys [key-fn data item]}}]
+(defui ui-list [{:keys [key-fn data item]}]
   ($ :div
     (for [x data]
       ($ item {:data x :key (key-fn x)}))))
 
-($ ul-list
+($ ui-list
   {:key-fn :id
    :data [{:id 1} {:id 2} {:id 3}]
    :item (uix/fn [{:keys [data]}]
@@ -84,7 +110,7 @@ function Button({ onClick, children }) {
 
 The `Button` component takes JSX attributes and the `"Press me"` string as a child element. The signature of the component declares a single parameter which is assigned to an object of passed in attributes + child elements stored under the `children` key.
 
-Similarly in UIx, components take a map of props and an arbitrary number of child element. The signature of `defui` declares a single parameter which is assigned a hash map of passed in properties + child elements stored under the `:children` key.
+Similarly in UIx, components take a map of props and an arbitrary number of child elements. The signature of `defui` declares a single parameter which is assigned a hash map of passed in properties + child elements stored under the `:children` key.
 
 ```clojure
 (defui button [{:keys [on-click children]}]
@@ -242,3 +268,12 @@ When destructing props in `uix.core/defui` or `uix.core/fn`, all keys that are n
 To spread or splice a map into props, use `:&` key. This works only at top level of the map literal: `{:width 100 :& props1}`. When spreading multiple props, use vector syntax `{:width 100 :& [props1 props2 props3]}`.
 
 > Note that props spreading works the same way how `merge` works in Clojure or `Object.assign` in JS, it's not a "deep merge".
+
+---
+
+## Common pitfalls and how to avoid them
+
+- Missing `:key` on list items — add a stable key via `{:key (key-fn x)}` when rendering collections.
+- Accidentally returning a function from an effect setup — UIx normalizes non‑functions, but a returned function is treated as a cleanup. See [Hooks](./hooks.md#return-value-in-effect-hooks).
+- Mixing JS objects and CLJ maps when merging props — use the `:&` spread to combine both safely.
+- Over‑rendering — memoize pure child components with `^:memo` or `uix.core/memo` when props are stable.
