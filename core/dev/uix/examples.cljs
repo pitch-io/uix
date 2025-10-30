@@ -3,7 +3,8 @@
             [cljs-bean.core :as bean]
             [cljs.spec.alpha :as s]
             [uix.core :as uix :refer [$ defui]]
-            [uix.dom]))
+            [uix.dom]
+            [uix.recipes]))
 
 (defn use-location []
   (bean/->clj (rr/useLocation)))
@@ -176,9 +177,20 @@
         route-tree (.addChildren root (into-array routes))]
     (rr/createRouter #js {:routeTree route-tree})))
 
+(defui app []
+  (let [[route set-route] (uix/use-state :example)]
+    ($ :<>
+      ($ :div.flex.gap-4.py-2.px-4
+        ($ :button {:on-click #(set-route :example)} "example")
+        ($ :button {:on-click #(set-route :recipes)} "recipes"))
+      (case route
+        :example ($ rr/RouterProvider {:router (create-router routes)})
+        :recipes ($ uix.recipes/root)
+        nil))))
+
 (defn init []
   (let [root (uix.dom/create-root (js/document.getElementById "root"))]
     (uix.dom/render-root
       ($ uix/strict-mode
-         ($ rr/RouterProvider {:router (create-router routes)}))
+         ($ app))
       root)))

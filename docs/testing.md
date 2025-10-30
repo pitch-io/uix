@@ -1,12 +1,12 @@
 # Testing
 
-There multiple stages of testing UIs built for web browsers and React/UIx specifically. Let's take a look at each of them, starting from higher level testing.
+There are multiple stages of testing UIs built for web browsers and React/UIx specifically. Let's take a look at each of them, starting from higher level testing.
 
 ## End to end testing
 
 End to end (e2e) tests are not really specific to any UI library and they are rather expensive, but it's a good way to make sure that critical user flows are working as expected.
 
-In e2e tests, you simulate user interactions with the browser, using one of popular APIs that control browsers, for example [Puppeteer](https://pptr.dev/) or [Seleinum](https://www.selenium.dev/). Each test covers a single user flow, for example, "user logs in", "user adds a product to the cart", "user checks out", etc.
+In e2e tests, you simulate user interactions with the browser, using one of popular APIs that control browsers, for example [Puppeteer](https://pptr.dev/) or [Selenium](https://www.selenium.dev/). Each test covers a single user flow, for example, "user logs in", "user adds a product to the cart", "user checks out", etc.
 
 Since Puppeteer is Node.js library and e2e tests do not interact with any of application code, I recommend to write e2e tests in JS as well to avoid additional complexity with tests setup.
 

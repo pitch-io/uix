@@ -228,7 +228,7 @@ See [core/dev/uix/linters.clj](/core/dev/uix/linters.clj) for a set of complete 
 
 # clj-kondo
 
-UIx has importable configuration for clj-kondo. You can important the configuration with:
+UIx has importable configuration for clj-kondo. You can import the configuration with:
 
 ```bash
 clj-kondo --lint "$(clojure -Spath)" --copy-configs --skip-lint

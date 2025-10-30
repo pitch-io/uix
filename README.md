@@ -8,6 +8,8 @@ _Idiomatic ClojureScript interface to modern React.js_
 
 > “UIx offers a seamless React integration, making code more efficient with powerful component composition, hooks, and customizable linting for enforcing best practices.” – Chris Etheridge, Cognician
 
+If you are using UIx, consider supporting the project via [Github Sponsors](https://github.com/sponsors/roman01la) or [Buy Me a Coffee](https://buymeacoffee.com/romanliutikov).
+
 [![CircleCI](https://circleci.com/gh/pitch-io/uix.svg?style=svg)](https://circleci.com/gh/pitch-io/uix)
 [![Clojars Project](https://img.shields.io/clojars/v/com.pitch/uix.core.svg)](https://clojars.org/com.pitch/uix.core)
 [![Clojars Project](https://img.shields.io/clojars/v/com.pitch/uix.dom.svg)](https://clojars.org/com.pitch/uix.dom)
@@ -38,28 +40,80 @@ npm install react@19.2.0 react-dom@19.2.0 --save-dev
 - Use fullstack starter project from Metosin [metosin/example-project](https://github.com/metosin/example-project)
 - Template project of a web app hosted on Cloudflare with REST API served from SQLite [roman01la/uix-cloudflare-template](https://github.com/roman01la/uix-cloudflare-template)
 
-## Usage
+## Quick start
 
-```clj
-(ns my.app
-  (:require [uix.core :refer [defui $]]
+1. deps.edn
+
+```clojure
+{:deps {org.clojure/clojurescript {:mvn/version "1.12.42"}
+        thheller/shadow-cljs {:mvn/version "3.2.1"}
+        com.pitch/uix.core {:mvn/version "1.4.5"}
+        com.pitch/uix.dom  {:mvn/version "1.4.5"}}}
+```
+
+2. shadow-cljs.edn
+
+```clojure
+{:deps true
+ :builds
+ {:app {:target :browser
+        :modules {:main {:entries [app.core]
+                         :init-fn app.core/start}}
+        :output-dir "out"
+        :asset-path "/out"
+        :devtools {:preloads [uix.preload]}}}}
+```
+
+3. index.html
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+  </head>
+  <body>
+    <div id="root"></div>
+    <script src="/out/main.js"></script>
+  </body>
+</html>
+```
+
+4. src/app/core.cljs
+
+```clojure
+(ns app.core
+  (:require [uix.core :as uix :refer [defui $]]
             [uix.dom]))
 
 (defui button [{:keys [on-click children]}]
-  ($ :button.btn {:on-click on-click}
-    children))
+  ($ :button.btn {:on-click on-click} children))
 
 (defui app []
-  (let [[state set-state!] (uix.core/use-state 0)]
+  (let [[state set-state!] (uix/use-state 0)]
     ($ :<>
       ($ button {:on-click #(set-state! dec)} "-")
       ($ :span state)
       ($ button {:on-click #(set-state! inc)} "+"))))
 
-(defonce root
-  (uix.dom/create-root (js/document.getElementById "root")))
+(defonce root (uix.dom/create-root (js/document.getElementById "root")))
 
-(uix.dom/render-root ($ app) root)
+(defn start []
+  (uix.dom/render-root ($ app) root))
+```
+
+5. Install and run
+
+```sh
+npm i -D react@19.2.0 react-dom@19.2.0
+clojure -M -m shadow.cljs.devtools.cli watch app
+```
+
+6. Production build
+
+```sh
+clojure -M -m shadow.cljs.devtools.cli release app
 ```
 
 ## Docs
