@@ -6,6 +6,7 @@
             [uix.core :refer [defui $]]
             [uix.uix :as uix]
             [uix.reagent :as reagent]
+            [uix.reagent2 :as reagent2]
             [uix.react :refer [Editor]]
             [uix.helix :as helix]))
 
@@ -29,15 +30,20 @@
 (defn ^:export run-reagent []
   (bench :reagent 10000 (render (r/as-element [reagent/editor]))))
 
+(defn ^:export run-reagent2 []
+  (bench :reagent 10000 (render (r/as-element [reagent2/editor]))))
+
 (defn -main [& args]
   (js/console.log "Warming up...")
   (bench :react 10000 (render (react/createElement Editor)))
   (bench :uix 10000 (render ($ uix/editor-compiled)))
   (bench :helix 10000 (render ($ helix/editor-compiled)))
   (bench :reagent 10000 (render (r/as-element [reagent/editor])))
+  (bench :reagent2 10000 (render (r/as-element [reagent2/editor])))
 
   (js/console.log "Running the benchmark...")
   (bench :react 10000 (render (react/createElement Editor)))
   (bench :uix 10000 (render ($ uix/editor-compiled)))
   (bench :helix 10000 (render ($ helix/editor-compiled)))
-  (bench :reagent 10000 (render (r/as-element [reagent/editor]))))
+  (bench :reagent 10000 (render (r/as-element [reagent/editor])))
+  (bench :reagent2 10000 (render (r/as-element [reagent2/editor]))))
