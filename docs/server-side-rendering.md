@@ -65,7 +65,7 @@ For that it's recommended to put shared code in `.cljc` namespaces and use [read
 (defn handle-request
   "Generates HTML to be sent to the client"
   []
-  (dom.server/render-to-static-markup ($ ui/title-bar)))
+  (dom.server/render-to-string ($ ui/title-bar)))
 
 ;; client.cljs
 (ns app.client
