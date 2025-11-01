@@ -2,7 +2,7 @@
         org.clj-commons/hickory {:mvn/version "0.7.3"}
         com.adamrenklint/preo {:mvn/version "0.1.0"}}
  :paths ["src" "resources"]
- :aliases {:dev {:extra-deps {cljfmt/cljfmt {:mvn/version "0.8.0"}
+ :aliases {:dev {:extra-deps {dev.weavejester/cljfmt {:mvn/version "0.15.3"}
                               clj-kondo/clj-kondo {:mvn/version "2025.02.20"}}}
            :benchmark {:extra-paths ["benchmark"]
                        :extra-deps {reagent/reagent {:mvn/version "2.0.0"}
