@@ -1,0 +1,4 @@
+{:paths ["./src" "./test" "./benchmark" "../dom/src" "../dom/test"]
+ :remove-consecutive-blank-lines? false
+ :extra-indents {doseq-loop [[:block 1]]
+                 uix.core/$ [[:inner 0]]}}
