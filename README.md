@@ -145,6 +145,7 @@ clojure -M -m shadow.cljs.devtools.cli release app
 - Other render targets
   - [React Native](/docs/react-native.md)
   - [React Three Fiber](/docs/react-three-fiber.md)
+  - [Preact](/docs/preact.md)
 - [Getting help from ChatGPT](/docs/chat-gpt.md)
 
 ## Recommended libraries
