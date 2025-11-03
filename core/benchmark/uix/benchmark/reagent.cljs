@@ -1,4 +1,4 @@
-(ns uix.reagent)
+(ns uix.benchmark.reagent)
 
 (defn input-field [{:keys [field-type type placeholder size]
                     :or {field-type :input}}]

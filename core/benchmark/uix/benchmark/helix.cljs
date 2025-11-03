@@ -1,4 +1,4 @@
-(ns uix.helix
+(ns uix.benchmark.helix
   (:require [helix.core :refer [defnc $]]
             [helix.dom :as d]))
 

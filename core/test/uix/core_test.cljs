@@ -7,7 +7,7 @@
             ["@testing-library/react" :as rtl]
             [uix.test-utils :as t]
             [uix.compiler.attributes :as attrs]
-            [uix.uix :refer [row-compiled]]
+            [uix.benchmark.uix :refer [row-compiled]]
             [clojure.string :as str]))
 
 (deftest test-use-ref
@@ -145,7 +145,7 @@
 (deftest test-source
   (is (= (uix.core/source test-source-component)
          "(defui test-source-component []\n  \"HELLO\")"))
-  (is (= (uix.core/source uix.uix/form-compiled)
+  (is (= (uix.core/source uix.benchmark.uix/form-compiled)
          "(defui form-compiled [{:keys [children]}]\n  ($ :form children))"))
   (is (= (uix.core/source row-compiled)
          "(defui row-compiled [{:keys [children]}]\n  ($ :div.row children))")))

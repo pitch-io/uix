@@ -1,4 +1,4 @@
-(ns uix.uix
+(ns uix.benchmark.uix
   (:require [uix.core :refer [defui $]]))
 
 (defui input-field-compiled
