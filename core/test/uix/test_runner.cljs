@@ -4,7 +4,7 @@
             [uix.core-test]
             [uix.compiler-test]
             [uix.hooks-test]
-            [uix.re-frame-test]
+            [uix.reagent-test]
             [uix.test-utils :as t]))
 
 (defn- print-comparison [m]
@@ -37,4 +37,4 @@
    'uix.core-test
    'uix.compiler-test
    'uix.hooks-test
-   'uix.re-frame-test))
+   'uix.reagent-test))
