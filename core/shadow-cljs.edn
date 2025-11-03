@@ -27,4 +27,12 @@
              :asset-path "/out"
              :modules {:main {:entries [uix.examples]
                               :init-fn uix.examples/init}}
-             :devtools {:preloads [uix.preload]}}}}
+             :devtools {:preloads [uix.preload]}}
+  :examples-preact {:target :browser
+                    :output-dir "out"
+                    :asset-path "/out"
+                    :modules {:main {:entries [uix.examples]
+                                     :init-fn uix.examples/init}}
+                    :devtools {:preloads [uix.preload]}
+                    :js-options {:resolve {"react" {:target :npm
+                                                    :require "preact/compat"}}}}}}
