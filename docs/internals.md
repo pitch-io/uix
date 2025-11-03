@@ -64,6 +64,10 @@ The linter leverages ClojureScript's analyzer to retrieve information about code
 
 When analyzing the linter collects and reports errors into ClojureScript's analyzer, that then takes care of printing those errors in terminal, failing a build and propagating them into shadow-cljs's on screen error display.
 
+### Reagent
+
+`uix.reagent` namespace provides integration of Reagent's Reaction type (Atom, Track or Cursor) into UIx components, via `use-reaction` hooks.
+
 ### Re-frame
 
 `uix.re-frame` namespace provides integration of re-frame subscriptions into UIx components, via `use-subscribe` and `use-reaction` hooks.
