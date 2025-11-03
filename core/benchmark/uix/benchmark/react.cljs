@@ -1,4 +1,4 @@
-(ns uix.react)
+(ns uix.benchmark.react)
 
 (defn InputField
   [^js props]

@@ -1,4 +1,4 @@
-(ns uix.reagent2
+(ns uix.benchmark.reagent2
   (:require [reagent.core :refer [defc]]))
 
 (defc input-field [{:keys [field-type type placeholder size]

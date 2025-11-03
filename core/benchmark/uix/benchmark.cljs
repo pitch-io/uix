@@ -4,11 +4,11 @@
             ["react-dom/server" :as rserver]
             [react :as react]
             [uix.core :refer [defui $]]
-            [uix.uix :as uix]
-            [uix.reagent :as reagent]
-            [uix.reagent2 :as reagent2]
-            [uix.react :refer [Editor]]
-            [uix.helix :as helix]))
+            [uix.benchmark.uix :as uix]
+            [uix.benchmark.reagent :as reagent]
+            [uix.benchmark.reagent2 :as reagent2]
+            [uix.benchmark.react :refer [Editor]]
+            [uix.benchmark.helix :as helix]))
 
 (set! (.-React js/globalThis) react)
 
