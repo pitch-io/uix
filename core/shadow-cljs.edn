@@ -35,4 +35,8 @@
                                      :init-fn uix.examples/init}}
                     :devtools {:preloads [uix.preload]}
                     :js-options {:resolve {"react" {:target :npm
-                                                    :require "preact/compat"}}}}}}
+                                                    :require "preact/compat"}
+                                           "react-dom" {:target :npm
+                                                        :require "preact/compat"}
+                                           "react-dom/client" {:target :npm
+                                                               :require "preact/compat/client"}}}}}}
