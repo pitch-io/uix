@@ -55,7 +55,7 @@
     (assoc-in db [:repos :value] value)))
 
 (rf/reg-event-fx :fetch-repos
-  (fn [db [_ uname]]
+  (fn [{:keys [db]} [_ uname]]
     {:db (assoc-in db [:repos :loading?] true)
      :http {:url (str "https://api.github.com/users/" uname "/repos")
             :on-ok :fetch-repos-ok
