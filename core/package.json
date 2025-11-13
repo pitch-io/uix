@@ -12,7 +12,6 @@
     "react-dom": "^19.2.0",
     "react-refresh": "^0.14.2",
     "source-map-support": "^0.5.21",
-    "tailwindcss": "^4.0.7",
-    "use-sync-external-store": "^1.4.0"
+    "tailwindcss": "^4.0.7"
   }
 }

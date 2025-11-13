@@ -1,6 +1,5 @@
 (ns uix.reagent
-  (:require ["use-sync-external-store/with-selector" :refer [useSyncExternalStoreWithSelector]]
-            [reagent.impl.component :as impl.component]
+  (:require [reagent.impl.component :as impl.component]
             [reagent.ratom :as ratom]
             [scheduler]
             [uix.core :as uix]))
@@ -33,12 +32,11 @@
     [ref]))
 
 (defn- use-sync-external-store [subscribe get-snapshot]
-  (useSyncExternalStoreWithSelector
+  (uix/use-sync-external-store
     subscribe
     get-snapshot
     nil ;; getServerSnapshot, only needed for SSR
-    identity ;; selector, not using, just returning the value itself
-    =)) ;; value equality check
+    identity)) ;; selector, not using, just returning the value itself
 
 (defn- run-reaction [^js ref]
   (let [^js rat (aget ref rat-key)

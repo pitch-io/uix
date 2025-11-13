@@ -178,16 +178,16 @@
   []
   (hooks/use-id))
 
-(def use-effect-event
+(defn use-effect-event
   "EXPERIMENTAL: Creates a stable event handler from a function, allowing it to be used in use-effect
    without adding the function as a dependency.
   See: https://react.dev/learn/separating-events-from-effects"
+  [f]
   (if (exists? react/useEffectEvent)
-    react/useEffectEvent
-    (fn [f]
-      (let [ref (use-ref nil)]
-        (reset! ref f)
-        (uix.core/use-callback (fn [& args] (apply @ref args)) [])))))
+    (react/useEffectEvent f)
+    (let [ref (use-ref nil)]
+      (reset! ref f)
+      (uix.core/use-callback (fn [& args] (apply @ref args)) []))))
 
 (defn use-sync-external-store
   "For reading and subscribing from external data sources in a way that’s compatible
@@ -201,7 +201,9 @@
   ([subscribe get-snapshot]
    (hooks/use-sync-external-store subscribe get-snapshot))
   ([subscribe get-snapshot get-server-snapshot]
-   (hooks/use-sync-external-store subscribe get-snapshot get-server-snapshot)))
+   (hooks/use-sync-external-store subscribe get-snapshot get-server-snapshot))
+  ([subscribe get-snapshot get-server-snapshot selector]
+   (hooks/use-sync-external-store subscribe get-snapshot get-server-snapshot selector)))
 
 (defn use-optimistic
   "Lets you show a different state while an async action is underway
