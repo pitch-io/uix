@@ -127,6 +127,41 @@
 (defn use-id []
   (r/useId))
 
+(let [did-warn? (volatile! false)
+      snapshot-changed? (fn [value get-snapshot]
+                          (try
+                            (not= value (get-snapshot))
+                            (catch :default e
+                              true)))]
+
+  (defn- use-sync-external-store* [subscribe get-snapshot get-server-snapshot]
+    (if (exists? r/useSyncExternalStore)
+      (r/useSyncExternalStore subscribe get-snapshot get-server-snapshot)
+      (let [value (get-snapshot)
+            [state force-update] (use-state #js {:inst #js {:value value :getSnapshot get-snapshot}})]
+        (when ^boolean goog.DEBUG
+          (when-not @did-warn?
+            (let [cached-value (get-snapshot)]
+              (when-not (identical? cached-value value)
+                (vreset! did-warn? true)
+                (js/console.error "The result of getSnapshot should be cached to avoid an infinite loop")))))
+        (use-layout-effect
+          (fn []
+            (set! (.. state -inst -value) value)
+            (set! (.. state -inst -getSnapshot) get-snapshot)
+            (when (snapshot-changed? (.. state -inst -value) (.. state -inst -getSnapshot))
+              (force-update #js {:inst (.. state -inst)})))
+          [subscribe value get-snapshot])
+        (use-effect
+          (fn []
+            (let [handle-store-change #(when (snapshot-changed? (.. state -inst -value) (.. state -inst -getSnapshot))
+                                         (force-update #js {:inst (.. state -inst)}))]
+              (handle-store-change)
+              (subscribe handle-store-change)))
+          [subscribe])
+        (use-debug value)
+        value))))
+
 (defn use-sync-external-store-with-selector [subscribe get-snapshot get-server-snapshot selector]
   (let [ref (use-ref nil)
         inst (or (.-current ref) #js {:hasValue false :value nil})
@@ -159,7 +194,7 @@
                                                                                            #(selector (get-server-snapshot)))]
                                                    [get-snapshot-with-selector get-server-snapshot-with-selector]))
                                                #js [get-snapshot get-server-snapshot selector])
-        value (r/useSyncExternalStore subscribe get-selection get-server-selection)]
+        value (use-sync-external-store* subscribe get-selection get-server-selection)]
     (use-effect
       (fn []
         (set! (.-hasValue inst) true)
@@ -170,9 +205,9 @@
 
 (defn use-sync-external-store
   ([subscribe get-snapshot]
-   (r/useSyncExternalStore subscribe get-snapshot))
+   (use-sync-external-store* subscribe get-snapshot js/undefined))
   ([subscribe get-snapshot get-server-snapshot]
-   (r/useSyncExternalStore subscribe get-snapshot get-server-snapshot))
+   (use-sync-external-store* subscribe get-snapshot get-server-snapshot))
   ([subscribe get-snapshot get-server-snapshot selector]
    (use-sync-external-store-with-selector subscribe get-snapshot get-server-snapshot selector)))
 
