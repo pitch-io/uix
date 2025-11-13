@@ -1,5 +1,24 @@
 # CHANGELOG
 
+## 1.4.6
+
+### New
+
+- Added `uix.dom/log-box` component to display caught errors in an error boundary in dev #261
+- Added `core/dev/uix/recipes` with various examples #264
+- Moved `use-reaction` into `uix.reagent` ns #267
+- Docs: using Preact with UIx, docs/preact.md #268
+
+### Improvements
+
+- Minor performance improvements
+
+### Fixes
+
+- Merging various class name attributes #258
+- Fixed `use-effect-event` linting #271
+- Backport `use-sync-external-store` shim and `use-sync-external-store-with-selector` #271
+
 ## 1.4.5
 
 ### New
