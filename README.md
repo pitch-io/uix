@@ -29,8 +29,8 @@ npm install react@19.2.0 react-dom@19.2.0 --save-dev
 ```
 
 ```clj
-{:deps {com.pitch/uix.core {:mvn/version "1.4.5"}
-        com.pitch/uix.dom {:mvn/version "1.4.5"}}}
+{:deps {com.pitch/uix.core {:mvn/version "1.4.6"}
+        com.pitch/uix.dom {:mvn/version "1.4.6"}}}
 ```
 
 ### How to start a new project with UIx
@@ -47,8 +47,8 @@ npm install react@19.2.0 react-dom@19.2.0 --save-dev
 ```clojure
 {:deps {org.clojure/clojurescript {:mvn/version "1.12.42"}
         thheller/shadow-cljs {:mvn/version "3.2.1"}
-        com.pitch/uix.core {:mvn/version "1.4.5"}
-        com.pitch/uix.dom  {:mvn/version "1.4.5"}}}
+        com.pitch/uix.core {:mvn/version "1.4.6"}
+        com.pitch/uix.dom  {:mvn/version "1.4.6"}}}
 ```
 
 2. shadow-cljs.edn
