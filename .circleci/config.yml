@@ -1,7 +1,6 @@
 version: 2.1
 
 orbs:
-  browser-tools: circleci/browser-tools@1.4.1
   github-cli: circleci/github-cli@2.2.0
 
 jobs:
@@ -23,7 +22,7 @@ jobs:
 
   build:
     docker:
-      - image: cimg/clojure:1.11-browsers
+      - image: cimg/clojure:1.12.0-openjdk-21.0-node
         command: "/bin/bash"
 
     working_directory: ~/repo

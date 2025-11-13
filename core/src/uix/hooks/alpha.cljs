@@ -127,11 +127,54 @@
 (defn use-id []
   (r/useId))
 
+(defn use-sync-external-store-with-selector [subscribe get-snapshot get-server-snapshot selector]
+  (let [ref (use-ref nil)
+        inst (or (.-current ref) #js {:hasValue false :value nil})
+        _ (set! (.-current ref) inst)
+        [get-selection get-server-selection] (use-memo
+                                               (fn []
+                                                 (let [memo? (volatile! false)
+                                                       snapshot (volatile! nil)
+                                                       selection (volatile! nil)
+                                                       selector (fn [next-snapshot]
+                                                                  (if-not @memo?
+                                                                    (let [next-selection (selector next-snapshot)]
+                                                                      (vreset! memo? true)
+                                                                      (vreset! snapshot next-snapshot)
+                                                                      (if (and (.-hasValue inst) (= (.-value inst) next-selection))
+                                                                        (vreset! selection (.-value inst))
+                                                                        (vreset! selection next-selection)))
+                                                                    (let [prev-snapshot @snapshot
+                                                                          prev-selection @selection]
+                                                                      (if (= prev-snapshot next-snapshot)
+                                                                        prev-selection
+                                                                        (let [next-selection (selector next-snapshot)]
+                                                                          (if (= prev-selection next-selection)
+                                                                            (do (vreset! snapshot next-snapshot)
+                                                                                prev-selection)
+                                                                            (do (vreset! snapshot next-snapshot)
+                                                                                (vreset! selection next-selection))))))))
+                                                       get-snapshot-with-selector #(selector (get-snapshot))
+                                                       get-server-snapshot-with-selector (when get-server-snapshot
+                                                                                           #(selector (get-server-snapshot)))]
+                                                   [get-snapshot-with-selector get-server-snapshot-with-selector]))
+                                               #js [get-snapshot get-server-snapshot selector])
+        value (r/useSyncExternalStore subscribe get-selection get-server-selection)]
+    (use-effect
+      (fn []
+        (set! (.-hasValue inst) true)
+        (set! (.-value inst) value))
+      #js [value])
+    (use-debug value)
+    value))
+
 (defn use-sync-external-store
   ([subscribe get-snapshot]
    (r/useSyncExternalStore subscribe get-snapshot))
   ([subscribe get-snapshot get-server-snapshot]
-   (r/useSyncExternalStore subscribe get-snapshot get-server-snapshot)))
+   (r/useSyncExternalStore subscribe get-snapshot get-server-snapshot))
+  ([subscribe get-snapshot get-server-snapshot selector]
+   (use-sync-external-store-with-selector subscribe get-snapshot get-server-snapshot selector)))
 
 (defn use-optimistic [state update-fn]
   (r/useOptimistic state update-fn))
