@@ -25,7 +25,7 @@ If you are using UIx, consider supporting the project via [Github Sponsors](http
 ## Installation
 
 ```
-npm install react@19.2.0 react-dom@19.2.0 --save-dev
+npm i -D react@19.2.0 react-dom@19.2.0 process
 ```
 
 ```clj
@@ -106,7 +106,7 @@ npm install react@19.2.0 react-dom@19.2.0 --save-dev
 5. Install and run
 
 ```sh
-npm i -D react@19.2.0 react-dom@19.2.0
+npm i -D react@19.2.0 react-dom@19.2.0 process
 clojure -M -m shadow.cljs.devtools.cli watch app
 ```
 
