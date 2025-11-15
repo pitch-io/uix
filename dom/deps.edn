@@ -1,8 +1,6 @@
 {:deps {}
  :paths ["src"]
- :aliases {:dev {:extra-deps {org.clojure/clojure {:mvn/version "1.10.3"}
-                              org.clojure/clojurescript {:mvn/version "1.10.879"}
-                              uix.core/uix.core {:local/root "../core"}}}
+ :aliases {:dev {:extra-deps {uix.core/uix.core {:local/root "../core"}}}
            :test {:extra-paths ["test"]
                   :extra-deps {clj-diffmatchpatch/clj-diffmatchpatch {:mvn/version "0.0.9.3"}
                                thheller/shadow-cljs {:mvn/version "2.15.5"}}}
