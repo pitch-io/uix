@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 1.4.7
+
+### Fixes
+
+- Use `globalThis` instead of `window`
+
 ## 1.4.6
 
 ### New

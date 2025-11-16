@@ -12,7 +12,7 @@
 (defn init-fast-refresh!
   "Injects react-refresh runtime. Should be called before UI is rendered"
   []
-  (refresh/injectIntoGlobalHook js/window))
+  (refresh/injectIntoGlobalHook js/globalThis))
 
 (defn refresh!
   "Should be called after hot-reload, in shadow's ^:dev/after-load hook"

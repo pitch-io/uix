@@ -14,7 +14,7 @@ echo 'import "./app/index.js";' > index.js
 
 ```clojure
 ;; deps.edn
-{:deps {com.pitch/uix.core {:mvn/version "1.4.6"}
+{:deps {com.pitch/uix.core {:mvn/version "1.4.7"}
         thheller/shadow-cljs {:mvn/version "2.25.8"}}
  :paths ["src" "dev"]}
 ```

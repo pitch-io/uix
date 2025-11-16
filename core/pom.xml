@@ -4,13 +4,9 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.pitch</groupId>
   <artifactId>uix.core</artifactId>
-  <version>1.4.6</version>
+  <version>1.4.7</version>
   <name>core</name>
   <licenses>
-    <license>
-      <name>Eclipse Public License - Version 2.0</name>
-      <url>https://www.eclipse.org/legal/epl-2.0/</url>
-    </license>
     <license>
       <name>Eclipse Public License - Version 2.0</name>
       <url>https://www.eclipse.org/legal/epl-2.0/</url>
@@ -19,7 +15,7 @@
   <scm>
     <connection>scm:git:git@github.com:pitch-io/uix.git</connection>
     <developerConnection>scm:git:git@github.com:pitch-io/uix.git</developerConnection>
-    <tag>7f2a543f11eee42d67f03b3788a646afbf0742ee</tag>
+    <tag>2880c50f639d58756985b522552fbe1e7e5d80b6</tag>
     <url>https://github.com/pitch-io/uix/tree/master/core</url>
   </scm>
   <dependencies>
