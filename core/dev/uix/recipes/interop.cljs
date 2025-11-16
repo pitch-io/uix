@@ -14,7 +14,7 @@
   (:require [uix.core :refer [defui $] :as uix]
             [react]))
 
-(set! js/window.h react/createElement)
+(set! js/globalThis.h react/createElement)
 
 (def js-list
   (js*

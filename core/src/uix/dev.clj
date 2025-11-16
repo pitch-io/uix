@@ -38,10 +38,10 @@
 
 (defn fast-refresh-signature [var-sym body]
   `(when ~goog-debug
-     (when (cljs.core/exists? js/window.uix.dev)
-       (let [sig# (js/window.uix.dev.signature!)]
+     (when (cljs.core/exists? js/globalThis.uix.dev)
+       (let [sig# (js/globalThis.uix.dev.signature!)]
          (sig# ~var-sym ~(str/join (rewrite-forms (uix.lib/find-form uix.linter/hook-call? body))) nil nil)
-         (js/window.uix.dev.register! ~var-sym (.-displayName ~var-sym))
+         (js/globalThis.uix.dev.register! ~var-sym (.-displayName ~var-sym))
          (set! (.-fast-refresh-signature ~var-sym) sig#)))))
 
 (defn from-hiccup [form]
