@@ -520,9 +520,13 @@
 
 (defn find-unnecessary-deps [env deps]
   (keep (fn [sym]
-          (when-let [hook (find-hook-for-symbol env sym)]
+          (if-let [hook (find-hook-for-symbol env sym)]
+            ;; stable hook
             (when (contains? stable-hooks hook)
-              (with-meta sym {:hook hook}))))
+              (with-meta sym {:hook hook}))
+            ;; constant value
+            (when (some-> env :locals (get sym) :init :op (= :const))
+              sym)))
         deps))
 
 (def state-hooks

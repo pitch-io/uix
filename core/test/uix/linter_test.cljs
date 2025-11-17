@@ -85,7 +85,7 @@
    []))
 
 (defui test-106 [{:keys [x]}]
-  (let [document 1]
+  (let [document x]
     (uix.core/use-effect
      (fn []
        (println x document))

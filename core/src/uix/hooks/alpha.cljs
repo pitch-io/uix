@@ -138,7 +138,7 @@
     (if (exists? r/useSyncExternalStore)
       (r/useSyncExternalStore subscribe get-snapshot get-server-snapshot)
       (let [value (get-snapshot)
-            [state force-update] (use-state #js {:inst #js {:value value :getSnapshot get-snapshot}})]
+            [^js state force-update] (use-state #js {:inst #js {:value value :getSnapshot get-snapshot}})]
         (when ^boolean goog.DEBUG
           (when-not @did-warn?
             (let [cached-value (get-snapshot)]
