@@ -327,7 +327,9 @@
     (set! (.-uix-component? ref-comp) true)
     ref-comp))
 
-(defn clone-element [^js element props & children]
+(defn clone-element
+  "Similar to React.createElement but for UIx elements"
+  [^js element props & children]
   (let [type (.-type element)
         okey (.-key element)
         oref (.-ref element)
