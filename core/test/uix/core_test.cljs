@@ -1,13 +1,14 @@
 (ns uix.core-test
   (:require [cljs.spec.alpha :as s]
             [clojure.test :refer [deftest is async testing run-tests]]
-            [uix.core :refer [defui $]]
+            [uix.core :refer [defui $ defcontext]]
             [uix.lib]
             [react :as r]
             ["@testing-library/react" :as rtl]
             [uix.test-utils :as t]
             [uix.compiler.attributes :as attrs]
             [uix.benchmark.uix :refer [row-compiled]]
+            [uix.dom.server :as server]
             [clojure.string :as str]))
 
 (deftest test-use-ref
@@ -525,6 +526,20 @@
       (is (= "blue" (aget (.. el -props -style) "--text-color")))
       (is (= "red" (aget (.. el1 -props -style) "--main-color")))
       (is (= "blue" (aget (.. el1 -props -style) "--text-color"))))))
+
+(defcontext *theme* :light)
+
+(defui h1t [{:keys [v]}]
+  ($ :<>
+    (name (uix.core/use-context *theme*))
+    (when (pos? v)
+      ($ *theme* {:value :blue}
+        ($ h1t {:v (dec v)})))))
+
+(deftest test-defcontext
+  (is (= "dark<!-- -->blue"
+         (server/render-to-string ($ *theme* {:value :dark}
+                                     ($ h1t {:v 1}))))))
 
 (defn -main []
   (run-tests))

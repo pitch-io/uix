@@ -141,3 +141,25 @@ For a quick global shared state
   ($ :button {:on-click #(swap! state inc)}
     "+"))
 ```
+
+### `defcontext`
+
+Not a hook, but when you write cross-platform UIx code in clj/cljs and use React's context, use `uix.core/defcontext` macro to create context that works in both JS and JVM.
+
+```clojure
+(defcontext *theme* :light)
+
+(defhook use-dark-theme? []
+  (= :dark (use-context *theme*)))
+
+(defui top-bar []
+  (let [dark-theme? (use-dark-theme?)]
+    ($ :div {:style {:color (if dark-theme? "white" "black")}}
+      "top bar")))
+
+(defui app []
+  ($ *theme* {:value :dark}
+    ($ top-bar)))
+```
+
+`defcontext` creates Clojure's dynamic var and uses `binding` under the hood, when the code runs on JVM.

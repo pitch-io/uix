@@ -201,6 +201,14 @@
     (uix.linter/lint! sym fdecl &form &env)
     `(defn ~fname ~@fdecl)))
 
+(defmacro defcontext [sym value]
+  "Like `create-context`, but should be used when writing cross-platform code (clj/cljs).
+  Creates a dynamic var in clj."
+  `(def ~(vary-meta sym merge {:dynamic true :uix/context true})
+     ~(if (uix.lib/cljs-env? &env)
+        `(create-context ~value)
+        value)))
+
 ;; === Error boundary ===
 
 (defn create-error-boundary
@@ -236,6 +244,9 @@
 
 (defn use-context [value]
   (hooks/use-context value))
+
+(defn use-atom [ref]
+  @ref)
 
 (defn use-debug
   ([v]

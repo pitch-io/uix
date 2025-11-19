@@ -41,11 +41,6 @@
 (deftest test-use-memo
   (is (= 1 (uix/use-memo #(inc 0) []))))
 
-(deftest test-use-memo
-  (is (thrown-with-msg? UnsupportedOperationException
-                        #"use-context is not implemented yet"
-                        (uix/use-context 1))))
-
 (deftest test-use-imperative-handle
   (let [called? (atom false)]
     (is (nil? (uix/use-imperative-handle nil #(reset! called? true))))
