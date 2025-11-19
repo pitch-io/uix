@@ -2,9 +2,10 @@
   (:require [cljs.env :as env]
             [clojure.string :as str]
             [clojure.test :refer :all]
-            [uix.core :as uix]
+            [uix.core :as uix :refer [defui $ defcontext]]
             [cljs.analyzer :as ana]
-            [preo.core]))
+            [preo.core]
+            [uix.dom.server :as server]))
 
 (deftest test-parse-sig
   (is (thrown-with-msg? AssertionError #"uix.core\/defui doesn't support multi-arity"
@@ -143,3 +144,18 @@
     (is (= [identity {:on-click identity :width 100 :x 1} "child"]
            (uix/$ identity {:on-click prn :& [props {:on-click identity} {:x 1}]}
                   "child")))))
+
+(defcontext *theme* :light)
+
+(defui h1 [{:keys [v]}]
+  ($ :<>
+    (name (uix/use-context *theme*))
+    (when (pos? v)
+      ($ *theme* {:value :blue}
+        ($ h1 {:v (dec v)})))))
+
+(deftest test-defcontext
+  (is (= "dark<!-- -->blue"
+         (server/render-to-string
+           ($ *theme* {:value :dark}
+              ($ h1 {:v 1}))))))

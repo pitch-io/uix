@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## Next
+
+### New
+
+- Added cross-platform clj/cljs React context via `uix.core/defhook` macro
+- Added clj version of `use-atom`
+
 ## 1.4.7
 
 ### Fixes

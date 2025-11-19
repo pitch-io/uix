@@ -159,10 +159,17 @@
                                                   [spread-props]))))
       v)))
 
+(defn compile-element-clj* [v {:keys [env] :as opts}]
+  (if (and (symbol? (first v))
+           (every? true? ((juxt :dynamic :uix/context) (meta (resolve env (first v))))))
+    (let [[_ {:keys [value]} & children] v]
+      [:uix/bind-context `(fn [f#] (binding [~(first v) ~value] (f#))) (vec children)])
+    (with-spread-props v)))
+
 (defn compile-element [v {:keys [env] :as opts}]
   (if (uix.lib/cljs-env? env)
     (compile-element* v opts)
-    (with-spread-props v)))
+    (compile-element-clj* v opts)))
 
 ;; ========== forms rewriter ==========
 

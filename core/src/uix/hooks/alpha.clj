@@ -49,9 +49,7 @@
   (f))
 
 ;; == Context hook ==
-;; TODO: requires changes tp how context is created
 (defn use-context [v]
-  (throw (UnsupportedOperationException. "use-context is not implemented yet"))
   v)
 
 ;; == Imperative Handle hook ==
