@@ -1,5 +1,5 @@
 {:deps {cljs-bean/cljs-bean {:mvn/version "1.9.0"}
-        org.clj-commons/hickory {:mvn/version "0.7.3"}
+        org.clj-commons/hickory {:mvn/version "0.7.7"}
         com.adamrenklint/preo {:mvn/version "0.1.0"}}
  :paths ["src" "resources"]
  :aliases {:dev {:extra-deps {dev.weavejester/cljfmt {:mvn/version "0.15.3"}
