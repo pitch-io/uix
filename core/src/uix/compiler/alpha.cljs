@@ -59,7 +59,9 @@
 (defn- react-context-element [component-type ^js props-children children]
   (let [component-type (.-Provider ^js component-type)
         props (aget props-children 0)
-        js-props #js {:value (:value props)}
+        js-props (if-some [key (:key props)]
+                   #js {:key key :value (:value props)}
+                   #js {:value (:value props)})
         args (normalise-args component-type js-props props-children)]
     (create-element args children)))
 
