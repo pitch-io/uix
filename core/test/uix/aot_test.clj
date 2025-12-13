@@ -1,5 +1,6 @@
 (ns uix.aot-test
-  (:require [clojure.test :refer :all]
+  (:require [cljs.env :as env]
+            [clojure.test :refer :all]
             [uix.compiler.aot :as aot]
             [uix.compiler.attributes :as attrs]
             [cljs.analyzer :as ana]))
@@ -36,14 +37,16 @@
          (attrs/compile-attrs '{:style {:pointer-events (when x :none)}}))))
 
 (deftest test-compile-html
-  (with-redefs [uix.lib/cljs-env? (fn [_] true)
-                ana/resolve-var (fn [_ _] nil)]
-    (is (= (aot/compile-element [:h1] nil)
-           '(js* "~{}(~{}, ...~{}, ...~{})" uix.compiler.alpha/create-element* "h1" (cljs.core/array nil) (cljs.core/array))))
-    (is (= (aot/compile-element '[x {} 1 2] nil)
-           '(uix.compiler.alpha/component-element x (cljs.core/array {}) (cljs.core/array 1 2))))
-    (is (= (aot/compile-element '[x {:x 1 :ref 2} 1 2] nil)
-           '(uix.compiler.alpha/component-element x (cljs.core/array {:x 1 :ref 2}) (cljs.core/array 1 2))))))
+  (binding [aot/*memo-disabled?* true]
+    (with-redefs [uix.lib/cljs-env? (fn [_] true)
+                  ana/resolve-var (fn [_ _] nil)
+                  env/*compiler* (atom {})]
+      (is (= (aot/compile-element [:h1] nil)
+             '(js* "~{}(~{}, ...~{}, ...~{})" uix.compiler.alpha/create-element* "h1" (cljs.core/array nil) (cljs.core/array))))
+      (is (= (aot/compile-element '[x {} 1 2] nil)
+             '(uix.compiler.alpha/component-element x (cljs.core/array {}) (cljs.core/array 1 2))))
+      (is (= (aot/compile-element '[x {:x 1 :ref 2} 1 2] nil)
+             '(uix.compiler.alpha/component-element x (cljs.core/array {:x 1 :ref 2}) (cljs.core/array 1 2)))))))
 
 (defmacro stub-120 [x]
   (aot/form->element-type x))
