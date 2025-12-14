@@ -49,28 +49,29 @@
 
 (def ccache '-uix-ccahe)
 
-(defn- create-cache-lookup [deps value]
-  `(~ccache ~(vec deps) (fn [] ~value)))
+(defn- create-cache-lookup [slot-id deps value]
+  `(~ccache ~slot-id ~(vec deps) (fn [] ~value)))
 
 (defn with-memo-attrs [env attrs]
   ;; caches element's literal props map
   ;; {:title "string" :on-click handler} -> (memo {:title "string" :on-click handler} [handler]) <- deps
   (if *memo-disabled?*
     attrs
-    (let [var-name (symbol (str "a" (:line env) ":" (:column env)))
+    (let [slot-id (str "a" (:line env) ":" (:column env))
+          var-name (symbol slot-id)
           ns (-> env :ns :name)]
       (if-let [{:keys [var-name value deps]} (get-in @attrs-memo-reg [ns var-name])]
         (do
           (swap! attrs-memo-reg update ns dissoc var-name)
           (if (get-in env [:locals 'uix-memarker])
-            (create-cache-lookup deps value)
+            (create-cache-lookup slot-id deps value)
             attrs))
         (if (seq attrs)
           (let [deps-nodes (uix.linter/find-free-variable-nodes env attrs [])
                 deps (->> deps-nodes (map :name) distinct vec)]
             (swap! attrs-memo-reg assoc-in [ns var-name] {:deps-nodes deps-nodes :deps deps :value attrs :var-name var-name})
             (if (get-in env [:locals 'uix-memarker])
-              (create-cache-lookup deps attrs)
+              (create-cache-lookup slot-id deps attrs)
               attrs))
           attrs)))))
 
@@ -88,38 +89,102 @@
       form)
     @yep?))
 
-(defn- memo-body [fdecl ast]
+(defn- destructuring-form? [form]
+  "Returns true if form is a destructuring pattern (map or vector)"
+  (or (map? form) (vector? form)))
+
+(defn- get-binding-meta [binding-form]
+  "Gets metadata from a binding form, handling both symbols and destructuring"
+  (if (symbol? binding-form)
+    (meta binding-form)
+    ;; For destructuring, try to get meta from the form itself
+    ;; or from :as symbol if present
+    (or (meta binding-form)
+        (when (map? binding-form)
+          (some-> binding-form :as meta)))))
+
+(defn- find-symbols-in-form [form]
+  "Recursively finds all symbols in a form"
+  (let [syms (atom #{})]
+    (prewalk #(do (when (symbol? %) (swap! syms conj %)) %) form)
+    @syms))
+
+(defn- find-best-env-for-value [value loc->env all-binding-envs outer-env]
+  "Finds the best env that has the symbols from value as locals"
+  (let [value-syms (find-symbols-in-form value)
+        ;; Score an env by how many of the value's symbols it has as locals
+        score-env (fn [env]
+                    (if env
+                      (count (filter #(get-in env [:locals % :name]) value-syms))
+                      0))
+        ;; Try all available envs and pick the best one
+        all-envs (concat (vals loc->env) all-binding-envs [outer-env])
+        best-env (->> all-envs
+                      (filter some?)
+                      (sort-by score-env >)
+                      first)]
+    best-env))
+
+(defn- memo-body [fdecl ast outer-env]
   (let [get-loc (juxt :line :column)
         ast-seq (uix.linter/ast->seq ast)
+        ;; Build env map keyed by location
         loc->env (->> (map vector ast-seq (next ast-seq))
                       (reduce
                         (fn [ret [node node-next]]
                           (if (= :binding (:op node))
                             (assoc ret (get-loc node) (:env node-next))
                             ret))
-                        {}))]
+                        {}))
+        ;; Also collect all binding envs for fallback
+        all-binding-envs (->> ast-seq
+                              (filter #(= :binding (:op %)))
+                              (map #(-> % :env))
+                              (filter some?))]
     ;; TODO: hoist hooks calls
     (prewalk
       (fn [x]
         (cond
           ;; memo let bindings (let [...] ...)
-          ;; TODO: destructuring assignment
           (and (list? x) (= 'let (first x)) (vector? (second x)))
           (let [[_ bindings & body] x
+                ;; Get the let form's metadata for location
+                let-meta (meta x)
+                let-loc (get-loc let-meta)
                 bindings (->> bindings
                               (partition-all 2)
-                              (mapcat (fn [[sym value]]
-                                        (let [[line col :as loc] (get-loc (meta sym))]
+                              (mapcat (fn [[binding-form value]]
+                                        (let [m (get-binding-meta binding-form)
+                                              [line col :as loc] (get-loc m)]
                                           (cond
-                                            (literal? value) [sym value]
+                                            ;; Literal values don't need caching
+                                            (literal? value) [binding-form value]
 
-                                            (and (loc->env loc)
+                                            ;; Simple symbol binding with analyzable location
+                                            (and (symbol? binding-form)
+                                                 (loc->env loc)
                                                  (not (has-hook-call? value)))
                                             (let [env (loc->env loc)
+                                                  slot-id (str "l" line ":" col)
                                                   deps (uix.linter/find-free-variables env value [])]
-                                              [sym (create-cache-lookup deps value)])
+                                              [binding-form (create-cache-lookup slot-id deps value)])
 
-                                            :else [sym value])))))]
+                                            ;; Destructuring binding - wrap the value in cache lookup
+                                            (and (destructuring-form? binding-form)
+                                                 (not (has-hook-call? value)))
+                                            (let [;; Find the best env that has the value's symbols
+                                                  env (find-best-env-for-value value loc->env all-binding-envs outer-env)
+                                                  ;; Use let form's location if binding has no metadata
+                                                  slot-id (str "d" (or line (first let-loc) 0) 
+                                                               ":" (or col (second let-loc) 0))
+                                                  deps (when env
+                                                         (uix.linter/find-free-variables env value []))]
+                                              (if (seq deps)
+                                                [binding-form (create-cache-lookup slot-id deps value)]
+                                                ;; No deps found, skip caching for now
+                                                [binding-form value]))
+
+                                            :else [binding-form value])))))]
             `(let ~(vec bindings)
                ~@body))
 
@@ -144,7 +209,7 @@
                                        (:options @env/*compiler*))))
             body `(let [~'uix-memarker true
                         ~ccache (uix.core/-use-cache-internal)]
-                    ~@(memo-body fdecl body-ast))]
+                    ~@(memo-body fdecl body-ast env))]
         [body]))))
 
 
@@ -230,13 +295,14 @@
   ;; ($ :button {:on-click handler} "send") -> (memo ($ :button {:on-click handler} "send") [handler]) <- deps
   (if *memo-disabled?*
     ret
-    (let [var-name (symbol (str "e" (:line env) ":" (:column env)))
+    (let [slot-id (str "e" (:line env) ":" (:column env))
+          var-name (symbol slot-id)
           ns (-> env :ns :name)]
       (if-let [{:keys [var-name value deps]} (get-in @elements-memo-reg [ns var-name])]
         (do
           (swap! elements-memo-reg update ns dissoc var-name)
           (if (get-in env [:locals 'uix-memarker])
-            (create-cache-lookup deps value)
+            (create-cache-lookup slot-id deps value)
             ret))
         (let [deps-nodes (uix.linter/find-free-variable-nodes env el [])
               deps (->> deps-nodes (map :name) distinct vec)]

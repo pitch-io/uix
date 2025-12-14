@@ -408,19 +408,58 @@
         children))))
 
 (def ^:dynamic *-use-cache-internal* true)
+(def debug-memo? false)
+(def ^:private debug-memo-id (atom nil))
+
+(def ^:private stats (atom {:hit {} :miss {}}))
+
+(defn- log-loop []
+  (let [{:keys [hit miss]} @stats]
+    (when (or (seq hit) (seq miss))
+      (js/console.log "hit:" (count (mapcat identity (vals hit)))
+                      "miss:" (count (mapcat identity (vals miss))))
+      (js/console.group)
+      (doseq [[k v] miss]
+        (js/console.log "Cache miss component:" k)
+        (js/console.group)
+        (doseq [v v]
+          (js/console.log v))
+        (js/console.groupEnd))
+      (js/console.groupEnd)))
+  (reset! stats {:hit {} :miss {}})
+  (reset! debug-memo-id (js/requestAnimationFrame log-loop)))
 
 (defn -use-cache-internal []
-  (if *-use-cache-internal*
-    (let [id #js {:current 0}
-          cache (hooks/use-ref #js {})]
-      (fn [deps get-value]
-        (let [aid (.-current id)
-              did (str ^string aid "-0")
-              vid (str ^string aid "-1")]
-          (set! (.-current id) (inc aid))
-          (when (not= deps (aget (.-current cache) did))
-            (aset (.-current cache) did deps)
-            (aset (.-current cache) vid (get-value)))
-          (aget (.-current cache) vid))))
-    (fn [deps get-value]
-      (get-value))))
+  (use-effect-event
+    (if *-use-cache-internal*
+      (let [cache (hooks/use-ref #js {})]
+        (fn [slot-id deps get-value]
+          (let [cache-obj (.-current cache)
+                deps-key (str slot-id "-d")
+                value-key (str slot-id "-v")
+                cached-deps (aget cache-obj deps-key)
+                neq? (not= deps cached-deps)]
+            (when debug-memo?
+              (when-not @debug-memo-id
+                (js/requestAnimationFrame log-loop))
+              (let [loc (-> js/__REACT_DEVTOOLS_GLOBAL_HOOK__
+                            (.-rendererInterfaces)
+                            (.get 1)
+                            (.getComponentStack)
+                            (.-componentStack)
+                            (.trim)
+                            (.split "\n")
+                            (aget 0)
+                            (.trim)
+                            (.split " ")
+                            (aget 1))
+                    diff (js/clojure.data.diff cached-deps deps)]
+                (if neq?
+                  (swap! stats update-in [:miss loc] (fnil conj []) diff)
+                  (swap! stats update-in [:hit loc] (fnil conj []) diff))))
+            (when neq?
+              (aset cache-obj deps-key deps)
+              (aset cache-obj value-key (get-value)))
+            (aget cache-obj value-key))))
+      (fn [_slot-id _deps get-value]
+        (get-value)))))
