@@ -50,4 +50,8 @@
 (def fragment react/Fragment)
 
 (defn merge-props [static-class props]
-  (js* "Object.assign(...~{}, ~{})" props #js {:className (attrs/class-names static-class (.-className (aget props (dec (.-length props)))))}))
+  (let [props (js* "Object.assign(...~{})" props)
+        class-name (.-className props)]
+    (when (and class-name (not (.includes class-name static-class)))
+      (set! (.-className props) (attrs/class-names static-class class-name)))
+    props))

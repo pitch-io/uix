@@ -418,8 +418,11 @@
       (testing "class names merging"
         (let [props1 {:class "ok"}
               props2 {:class "world"}
-              el (uix.core/$ :div.hello {:title "x" :& [props1 props2]})]
-          (is (= "hello world" (.. el -props -className))))))
+              props3 {:title "x"}
+              el1 (uix.core/$ :div.hello {:title "x" :& [props1 props2]})
+              el2 (uix.core/$ :div.hello {:class "x1" :& props3})]
+          (is (= "hello world" (.. el1 -props -className)))
+          (is (= "hello x1" (.. el2 -props -className))))))
     (testing "dynamic"
       (let [tag :div
             props {:width 100 :style {:color :blue}}
