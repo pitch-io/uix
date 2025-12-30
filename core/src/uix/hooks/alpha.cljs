@@ -225,7 +225,7 @@
 
 ;;; ===========================
 
-(defn- use-batched-subscribe
+(defn use-batched-subscribe
   "Takes an atom-like ref type and returns a function
   that adds change listeners to the ref"
   [^js ref]
