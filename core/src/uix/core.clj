@@ -15,12 +15,13 @@
 
 (def ^:private goog-debug (with-meta 'goog.DEBUG {:tag 'boolean}))
 
-(defn- no-args-component [sym var-sym body]
-  `(defn ~sym []
-     (let [f# (core/fn [] ~@body)]
-       (if ~goog-debug
-         (binding [*current-component* ~var-sym] (f#))
-         (f#)))))
+(defn- no-args-component [sym var-sym fname body]
+  `(def ~sym
+     (core/fn ~fname [] ;; TODO: in case of memo should be able to refer to memoized component recursively
+       (let [f# (core/fn [] ~@body)]
+         (if ~goog-debug
+           (binding [*current-component* ~var-sym] (f#))
+           (f#))))))
 
 (def props-assert-fn (atom (core/fn [& args] true)))
 
@@ -34,23 +35,24 @@
   (when props-cond
     (swap! env/*compiler* assoc-in [::ana/namespaces ns :uix/specs sym] props-cond)))
 
-(defn- with-args-component [sym var-sym args body props-cond]
+(defn- with-args-component [sym var-sym fname args body props-cond]
   (let [props-sym (gensym "props")
         [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
-    `(defn ~sym [props#]
-       (let [~props-sym (glue-args props#)
-             ~(first args) ~props-sym
-             ~(or rest-sym `_#) (dissoc ~props-sym ~@dissoc-ks)
-             f# (core/fn []
-                  ~(with-props-cond props-cond props-sym)
-                  ~@body)]
-         (if ~goog-debug
-           (binding [*current-component* ~var-sym]
-             (assert (or (map? ~props-sym)
-                         (nil? ~props-sym))
-                     (str "UIx component expects a map of props, but instead got " ~props-sym))
-             (f#))
-           (f#))))))
+    `(def ~sym
+       (core/fn ~fname [props#] ;; TODO: in case of memo should be able to refer to memoized component recursively
+         (let [~props-sym (glue-args props#)
+               ~(first args) ~props-sym
+               ~(or rest-sym `_#) (dissoc ~props-sym ~@dissoc-ks)
+               f# (core/fn []
+                    ~(with-props-cond props-cond props-sym)
+                    ~@body)]
+           (if ~goog-debug
+             (binding [*current-component* ~var-sym]
+               (assert (or (map? ~props-sym)
+                           (nil? ~props-sym))
+                       (str "UIx component expects a map of props, but instead got " ~props-sym))
+               (f#))
+             (f#)))))))
 
 (defn- no-args-fn-component [sym var-sym body]
   `(core/fn ~sym []
@@ -105,26 +107,29 @@
         [fname args fdecl props-cond] (parse-defui-sig `defui sym fdecl)]
     (uix.linter/lint! sym fdecl &form &env)
     (if (uix.lib/cljs-env? &env)
-      (let [memo? (-> sym meta :memo)
+      (let [memo? (if-some [memo? (-> sym meta :memo)] memo? true)
             memo-sym (gensym fname)
             memo-fname (if memo?
                          (with-meta memo-sym (meta fname))
                          fname)
             var-sym (-> (str (-> &env :ns :name) "/" fname) symbol (with-meta {:tag 'js}))
             memo-var-sym (-> (str (-> &env :ns :name) "/" memo-fname) symbol (with-meta {:tag 'js}))
-            [hoisted body] (-> (uix.dev/with-fast-refresh memo-var-sym fdecl)
-                               (aot/rewrite-forms :hoist? true :fname fname :force? (:test/inline (meta sym))))]
+            [hoisted body] (aot/rewrite-forms fdecl :hoist? true :fname fname :force? (:test/inline (meta sym)))
+            body (->> body
+                      (aot/emit-memoized &env args)
+                      (uix.dev/with-fast-refresh memo-var-sym))]
         (register-spec! props-cond ns sym)
         `(do
            ~@(aot/inline-elements hoisted &env true (:test/inline (meta sym)))
            ~(if (empty? args)
-              (no-args-component memo-fname memo-var-sym body)
-              (with-args-component memo-fname memo-var-sym args body props-cond))
+              (no-args-component memo-fname memo-var-sym fname body)
+              (with-args-component memo-fname memo-var-sym fname args body props-cond))
            (set! (.-uix-component? ~memo-var-sym) true)
            (set-display-name ~memo-var-sym ~(str var-sym))
            ~(uix.dev/fast-refresh-signature memo-var-sym body)
            ~(when memo?
-              `(def ~fname (uix.core/memo ~memo-sym)))))
+              `(do (def ~fname (uix.core/memo ~memo-sym))
+                   (set-display-name ~fname ~(str memo-var-sym))))))
       (let [args-sym (gensym "args")
             [args dissoc-ks rest-sym] (uix.lib/rest-props args)]
         `(defn ~fname [& ~args-sym]
