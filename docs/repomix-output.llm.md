@@ -991,7 +991,6 @@ When a non-UIx component is passed into `$`, the props map is converted into JS 
      - `:charset` -> `"charSet"`
 1. When a component expects a kebab-cased key, it can be passed as a string to avoid conversion.
 1. props map is converted _shallowly_ into a JavaScript object, meaning that nested collections and maps are not converted. If a JS component expects a prop to hold an array or an object, you have to pass it explicitly. There are two exceptions though:
-
    - `:style` map is always converted into a JS object because it's a common prop, when passing styles into a third-party component.
    - Keyword values are converted into strings.
 
@@ -1526,7 +1525,7 @@ echo 'import "./app/index.js";' > index.js
 
 ```clojure
 ;; deps.edn
-{:deps {com.pitch/uix.core {:mvn/version "1.4.8"}
+{:deps {com.pitch/uix.core {:mvn/version "1.4.9"}
         thheller/shadow-cljs {:mvn/version "3.2.1"}}
  :paths ["src" "dev"]}
 ```

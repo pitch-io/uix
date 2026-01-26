@@ -1,4 +1,4 @@
 {:group-id "com.pitch"
  :artifact-id "uix.core"
- :version "1.4.8"
+ :version "1.4.9"
  :scm-url "https://github.com/pitch-io/uix/tree/master/core"}

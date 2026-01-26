@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## 1.4.9
+
+### Fixes
+
+- `defcontext`-defined context can take key prop
+- fix class names merging in spread props
+
 ## 1.4.8
 
 ### New
