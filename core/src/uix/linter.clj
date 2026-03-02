@@ -342,6 +342,22 @@
 (defmethod ana/error-message ::element-unnecessary-spread [_ {:keys [source] :as v}]
   "Spreading a single props map into empty map literal doesn't make sense, instead pass props symbol itself.")
 
+(defmethod ana/error-message ::effect-event-as-prop [_ _]
+  (str "useEffectEvent value should not be passed as a prop to a React element.\n"
+       "Effect events are intended for use inside effects only and may return unstable references.\n"
+       "Read https://react.dev/learn/separating-events-from-effects for more context"))
+
+(defmethod ana/error-message ::effect-event-leaked-from-hook [_ _]
+  (str "useEffectEvent value should not be returned from a custom hook.\n"
+       "Effect events are intended for use inside effects only and may return unstable references.\n"
+       "Callers receiving this value may incorrectly use it in dependency arrays, causing infinite loops.\n"
+       "Read https://react.dev/learn/separating-events-from-effects for more context"))
+
+(def effect-event-hooks
+  #{"use-effect-event" "useEffectEvent"})
+
+(declare find-hook-for-symbol)
+
 (defmulti lint-component (fn [type form env]))
 (defmulti lint-element (fn [type form env]))
 (defmulti lint-hook-with-deps (fn [type form env]))
@@ -357,6 +373,16 @@
                      (== 1 (count (:& props)))))
         (add-error! form ::element-unnecessary-spread (form->loc (:& props)))))))
 
+(defmethod lint-element :element/effect-event-as-prop [_ form env]
+  (when (uix.lib/cljs-env? env)
+    (let [v (rest form)
+          [_ attrs] (uix.lib/normalize-element env v)]
+      (when (map? attrs)
+        (doseq [[k v] (dissoc attrs :& :key)]
+          (when (and (symbol? v)
+                     (contains? effect-event-hooks (find-hook-for-symbol env v)))
+            (add-error! form ::effect-event-as-prop (form->loc v))))))))
+
 (defn- run-linters! [mf & args]
   (doseq [[key f] (.getMethodTable ^clojure.lang.MultiFn mf)]
     (apply f key args)))
@@ -371,6 +397,58 @@
                          (or (:env %) env)
                          (merge {:column column :line line} m %))
            errors))))
+
+(defn- collect-effect-event-syms
+  "Walks a source form collecting symbols bound to use-effect-event via let."
+  [form]
+  (let [syms (atom #{})]
+    (clojure.walk/prewalk
+     (fn [x]
+       (when (and (seq? x) ('#{let let*} (first x)))
+         (doseq [[sym init] (partition 2 (second x))]
+           (when (and (symbol? sym)
+                      (hook-call? init "use-effect-event"))
+             (swap! syms conj sym))))
+       x)
+     form)
+    @syms))
+
+(defn- references-any-sym?
+  "Returns true if form references any symbol in syms-set (outside hook calls)."
+  [form syms-set]
+  (let [found? (volatile! false)]
+    (clojure.walk/prewalk
+     (fn [x]
+       (cond
+         @found? nil
+         (hook-call? x) nil
+         (and (symbol? x) (syms-set x)) (do (vreset! found? true) nil)
+         :else x))
+     form)
+    @found?))
+
+(defn- tail-expr
+  "Extracts the tail (return) expression from a form, unwrapping let/do blocks."
+  [form]
+  (if (and (seq? form) (symbol? (first form)))
+    (case (name (first form))
+      ("let" "let*") (recur (last form))
+      "do" (recur (last form))
+      form)
+    form))
+
+(defmethod lint-component :component/effect-event-leaked [_ form env]
+  (when (and (seq? form) (= 'defhook (first form)))
+    (let [;; form is (defhook name [args] ...body...) or (defhook name docstring [args] ...body...)
+          parts (rest (rest form)) ;; skip defhook and name
+          body (drop-while #(not (vector? %)) parts)
+          body-exprs (rest body) ;; skip [args]
+          ret-expr (tail-expr (last body-exprs))
+          ee-syms (collect-effect-event-syms (cons 'do body-exprs))]
+      (when (and (seq ee-syms)
+                 (references-any-sym? ret-expr ee-syms))
+        (add-error! form ::effect-event-leaked-from-hook
+                    (form->loc (or ret-expr form)))))))
 
 (defn lint! [sym body form env]
   (binding [*component-context* (atom {:errors []})]

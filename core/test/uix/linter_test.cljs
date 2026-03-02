@@ -144,3 +144,25 @@
      (for [i (range 10)]
        (->> {:key (str "foo-" i)}
             ($ :span)))))
+
+;; Should warn: effect event passed as prop
+(defui test-effect-event-as-prop []
+  (let [handler (uix/use-effect-event #(prn "click"))]
+    ($ :button {:on-click handler})))
+
+;; Should NOT warn: effect event used in effect only
+(defui test-effect-event-in-effect []
+  (let [handler (uix/use-effect-event #(prn "click"))]
+    (uix/use-effect #(handler) [])
+    ($ :div)))
+
+;; Should warn: effect event leaked from hook
+(defhook use-leaking-effect-event []
+  (let [handler (uix/use-effect-event #(prn "action"))]
+    {:handler handler}))
+
+;; Should NOT warn: effect event stays internal
+(defhook use-safe-effect-event []
+  (let [handler (uix/use-effect-event #(prn "action"))]
+    (uix/use-effect #(handler) [])
+    {:data "ok"}))

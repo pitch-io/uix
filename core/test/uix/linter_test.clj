@@ -309,7 +309,15 @@
       (is (str/includes? out-str (str :uix.linter/interop-ref-read)))
       (is (str/includes? out-str (str :uix.linter/interop-ref-write)))
       (is (str/includes? out-str "use-ref hook in UIx returns Atom-like ref, use @ instead of .-current to access its value."))
-      (is (str/includes? out-str "use-ref hook in UIx returns Atom-like ref, use reset! instead of set! to update its value.")))))
+      (is (str/includes? out-str "use-ref hook in UIx returns Atom-like ref, use reset! instead of set! to update its value.")))
+
+    (testing "should fail on effect event passed as prop"
+      (is (str/includes? out-str (str :uix.linter/effect-event-as-prop)))
+      (is (str/includes? out-str "useEffectEvent value should not be passed as a prop")))
+
+    (testing "should fail on effect event leaked from hook"
+      (is (str/includes? out-str (str :uix.linter/effect-event-leaked-from-hook)))
+      (is (str/includes? out-str "useEffectEvent value should not be returned from a custom hook")))))
 
 ;; === Subscribe call in JVM ===
 
