@@ -520,8 +520,8 @@
                              ("use-state" "useState" "use-reducer" "useReducer")
                              (str "`" sym "` is an unnecessary dependency because it's a state updater function with a stable identity")
 
-                             ("use-event" "useEvent" "use-effect-event" "useEffectEvent")
-                             (str "`" sym "` is an unnecessary dependency because it's a function created using useEffectEvent hook that has a stable identity")
+                             ("use-effect-event" "useEffectEvent")
+                             (str "`" sym "` is an unnecessary dependency because it's an effect event that should only be called inside effects, not referenced in dependency arrays")
 
                              nil)))
                    (str/join "\n"))
@@ -593,7 +593,6 @@
   #{"use-state" "useState"
     "use-reducer" "useReducer"
     "use-ref" "useRef"
-    "use-event" "useEvent"
     ;; Effect events are not stable in React 19.2+ (unstable by design),
     ;; but are still unnecessary deps since they should only be called
     ;; inside effects, never referenced in dependency arrays.
