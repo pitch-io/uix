@@ -594,6 +594,9 @@
     "use-reducer" "useReducer"
     "use-ref" "useRef"
     "use-event" "useEvent"
+    ;; Effect events are not stable in React 19.2+ (unstable by design),
+    ;; but are still unnecessary deps since they should only be called
+    ;; inside effects, never referenced in dependency arrays.
     "use-effect-event" "useEffectEvent"})
 
 (defn find-unnecessary-deps [env deps]
