@@ -179,9 +179,15 @@
   (hooks/use-id))
 
 (defn use-effect-event
-  "EXPERIMENTAL: Creates a stable event handler from a function, allowing it to be used in use-effect
-   without adding the function as a dependency.
-  See: https://react.dev/learn/separating-events-from-effects"
+  "Creates an event handler that always sees the latest props/state but doesn't
+   need to be listed in effect dependencies. The returned function should only be
+   called from inside effects — never passed as props or returned from hooks.
+
+   NOTE: With React 19.2+ the native useEffectEvent is used, which intentionally
+   returns an unstable reference on every render. The pre-19.2 fallback returns a
+   stable reference via useCallback, but callers should not rely on stability.
+
+   See: https://react.dev/learn/separating-events-from-effects"
   [f]
   (if (exists? react/useEffectEvent)
     (react/useEffectEvent f)
