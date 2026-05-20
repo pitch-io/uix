@@ -12,7 +12,11 @@
      keep keep-indexed mapcat})
 
 (defn- uix-element? [name]
-  (= (api/resolve {:name name :call true}) '{:name $ :ns uix.core}))
+  ;; api/resolve in clj-kondo >=2025.04.07 NPEs on nil :name; older versions
+  ;; returned nil. Callstack entries for fn literals can have :name nil, so
+  ;; guard here.
+  (when name
+    (= (api/resolve {:name name :call true}) '{:name $ :ns uix.core})))
 
 (defn $ [{:keys [node]}]
   (let [[sym props :as expr] (rest (api/sexpr node))]
