@@ -47,13 +47,31 @@
                                 (merge {:message (cond-> (str "Invalid DOM property " k ".")
                                                          (html-attrs k) (str " Did you mean " (html-attrs k) "?"))
                                         :type    :uix.dom/$-invalid-attribute}))))))
-    (when (->> (api/callstack)
-               (some #(and (contains? '#{cljs.core clojure.core} (:ns %))
-                           (contains? mapping-forms (:name %)))))
-      (when-not (->> (api/callstack)
-                     (take-while #(not (and (contains? '#{cljs.core clojure.core} (:ns %))
-                                            (contains? mapping-forms (:name %)))))
-                     (some #(uix-element? (:name %))))
+    (let [cs (api/callstack)
+          mapping-form? (fn [c]
+                          (and (contains? '#{cljs.core clojure.core} (:ns c))
+                               (contains? mapping-forms (:name c))))
+          ;; Forms whose return is one of their sub-expressions' returns — the
+          ;; $ below could still be the mapping fn's actual return.
+          return-path-form? (fn [c]
+                              (and (contains? '#{cljs.core clojure.core} (:ns c))
+                                   (contains? '#{fn fn* defn defn-
+                                                 do let let* loop
+                                                 when when-not when-let when-some when-first
+                                                 if if-not if-let if-some
+                                                 cond condp case
+                                                 cond-> cond->>}
+                                              (:name c))))
+          ;; Slice between us and the nearest mapping form. If every frame is a
+          ;; return-path form, the $ is (or could be) the direct return — a list
+          ;; item. Anything else (:vector, :map, :let-bindings, assoc/merge/...)
+          ;; means the $ is buried in constructed data and isn't itself a list item.
+          path-to-mapping (take-while (complement mapping-form?) cs)
+          on-return-path? (every? return-path-form? path-to-mapping)
+          wrapped-by-$? (some #(uix-element? (:name %)) path-to-mapping)]
+      (when (and (some mapping-form? cs)
+                 on-return-path?
+                 (not wrapped-by-$?))
         (when (or (and (map? props) (not (contains? props :key))) ;; ($ :a {})
                   (== 1 (count expr)) ;; ($ :a)
                   (and (list? props)
